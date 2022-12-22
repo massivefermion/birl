@@ -1,0 +1,15 @@
+name = "birl"
+version = "0.1.0"
+
+description = "datetime handling for gleam"
+licences = ["Apache-2.0"]
+links = [
+  {title = "gleam", href = "https://gleam.run"},
+]
+repository = {type = "github", user = "massivefermion", repo = "birl"}
+
+[dependencies]
+gleam_stdlib = "~> 0.25"
+
+[dev-dependencies]
+gleeunit = "~> 0.8"
