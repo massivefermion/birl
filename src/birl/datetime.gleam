@@ -3,6 +3,7 @@ import gleam/list
 import gleam/order
 import gleam/regex
 import gleam/string_builder
+import birl/duration
 
 pub opaque type DateTime {
   DateTime(Int)
@@ -16,35 +17,10 @@ pub type Time {
   Time(hour: Int, minute: Int, second: Int)
 }
 
-pub type Unit {
-  MilliSecond
-  Second
-  Minute
-  Hour
-  Day
-  Week
-  Month
-  Year
-}
-
-const second = 1_000
-
-const minute = 60_000
-
-const hour = 3_600_000
-
-const day = 86_400_000
-
-const week = 604_800_000
-
-const month = 2_592_000_000
-
-const year = 31_536_000_000
-
 const pattern = "\\d{4}-\\d{1,2}-\\d{1,2}T\\d{1,2}:\\d{1,2}:\\d{1,2}.\\d{3}Z"
 
-pub fn new() {
-  now()
+pub fn now() {
+  ffi_now()
   |> DateTime
 }
 
@@ -107,53 +83,39 @@ pub fn from_iso(value: String) -> Result(DateTime, Nil) {
   }
 }
 
-pub fn compare(a: DateTime, b: DateTime) -> order.Order {
-  let DateTime(ta) = a
-  let DateTime(tb) = b
-  case ta == tb {
+pub fn compare(a: DateTime, b: DateTime) {
+  let DateTime(dta) = a
+  let DateTime(dtb) = b
+  case dta == dtb {
     True -> order.Eq
     False ->
-      case ta < tb {
+      case dta < dtb {
         True -> order.Lt
         False -> order.Gt
       }
   }
 }
 
-pub fn add(value: DateTime, amount: Int, unit: Unit) -> DateTime {
-  case value {
-    DateTime(t) ->
-      case unit {
-        MilliSecond -> DateTime(t + amount)
-        Second -> DateTime(t + amount * second)
-        Minute -> DateTime(t + amount * minute)
-        Hour -> DateTime(t + amount * hour)
-        Day -> DateTime(t + amount * day)
-        Week -> DateTime(t + amount * week)
-        Month -> DateTime(t + amount * month)
-        Year -> DateTime(t + amount * year)
-      }
-  }
+pub fn difference(a: DateTime, b: DateTime) -> duration.Duration {
+  let DateTime(dta) = a
+  let DateTime(dtb) = b
+  duration.Duration(dtb - dta)
 }
 
-pub fn subtract(value: DateTime, amount: Int, unit: Unit) -> DateTime {
-  case value {
-    DateTime(t) ->
-      case unit {
-        MilliSecond -> DateTime(t - amount)
-        Second -> DateTime(t - amount * second)
-        Minute -> DateTime(t - amount * minute)
-        Hour -> DateTime(t - amount * hour)
-        Day -> DateTime(t - amount * day)
-        Week -> DateTime(t - amount * week)
-        Month -> DateTime(t - amount * month)
-        Year -> DateTime(t - amount * year)
-      }
-  }
+pub fn add(value: DateTime, duration: duration.Duration) -> DateTime {
+  let DateTime(timestamp) = value
+  let duration.Duration(duration) = duration
+  DateTime(timestamp + duration)
+}
+
+pub fn subtract(value: DateTime, duration: duration.Duration) -> DateTime {
+  let DateTime(timestamp) = value
+  let duration.Duration(duration) = duration
+  DateTime(timestamp - duration)
 }
 
 if erlang {
-  external fn now() -> Int =
+  external fn ffi_now() -> Int =
     "birl_ffi" "now"
 
   external fn ffi_to_parts(Int) -> #(#(Int, Int, Int), #(Int, Int, Int)) =
@@ -167,7 +129,7 @@ if erlang {
 }
 
 if javascript {
-  external fn now() -> Int =
+  external fn ffi_now() -> Int =
     "../birl_ffi.mjs" "now"
 
   external fn ffi_to_parts(Int) -> #(#(Int, Int, Int), #(Int, Int, Int)) =
