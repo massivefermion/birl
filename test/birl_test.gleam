@@ -2,6 +2,7 @@ import gleam/order
 import gleeunit
 import gleeunit/should
 import birl/datetime
+import birl/duration
 
 const iso_datetime = "2022-12-22T16:38:23.000Z"
 
@@ -22,28 +23,28 @@ pub fn iso_test() {
 }
 
 pub fn new_test() {
-  datetime.new()
+  datetime.now()
   |> datetime.to_iso
   |> datetime.from_iso
   |> should.be_ok
 }
 
 pub fn add_test() {
-  let a = datetime.new()
-  let b = datetime.add(a, 9_192_631_770, datetime.Second)
+  let a = datetime.now()
+  let b = datetime.add(a, duration.new([#(9_192_631_770, duration.Second)]))
   datetime.compare(a, b)
   |> should.equal(order.Lt)
 }
 
 pub fn subtract_test() {
-  let a = datetime.new()
-  let b = datetime.subtract(a, 1300, datetime.MilliSecond)
+  let a = datetime.now()
+  let b = datetime.subtract(a, duration.new([#(1300, duration.MilliSecond)]))
   datetime.compare(a, b)
   |> should.equal(order.Gt)
 }
 
 pub fn equality_test() {
-  let dt = datetime.new()
+  let dt = datetime.now()
   datetime.compare(dt, dt)
   |> should.equal(order.Eq)
 }
@@ -63,10 +64,10 @@ pub fn from_parts_test() {
 }
 
 pub fn circular_test() {
-  let dt = datetime.new()
+  let dt = datetime.now()
   dt
-  |> datetime.add(22, datetime.Minute)
-  |> datetime.subtract(22 * 60, datetime.Second)
+  |> datetime.add(duration.new([#(4, duration.Year)]))
+  |> datetime.subtract(duration.new([#(4 * 365, duration.Day)]))
   |> datetime.compare(dt)
   |> should.equal(order.Eq)
 }
