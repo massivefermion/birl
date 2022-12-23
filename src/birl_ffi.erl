@@ -1,6 +1,6 @@
 -module(birl_ffi).
 
--export([now/0, to_parts/1, to_iso/1, from_iso/1]).
+-export([now/0, to_parts/1, to_iso/1, from_iso/1, monotonic_now/0]).
 
 -define(DaysInMonths, [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31]).
 
@@ -55,3 +55,5 @@ calculate_days_from_month(Year, Month, Days) ->
         false ->
             calculate_days_from_month(Year, Month - 1, Days + lists:nth(Month, ?DaysInMonths))
     end.
+
+monotonic_now() -> os:perf_counter(millisecond).

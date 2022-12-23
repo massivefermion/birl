@@ -19,3 +19,7 @@ export function from_iso(iso_date) {
   const date = new Date(iso_date)
   return date.getTime()
 }
+
+export function monotonic_now() {
+  return Math.ceil(globalThis.performance.now())
+}
