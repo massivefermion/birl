@@ -198,15 +198,17 @@ pub fn parse(expression: String) -> Result(Duration, Nil) {
     |> list.map(string.trim)
     |> list.map(string.lowercase)
     |> list.map(regex.scan(re, _))
-    |> list.filter(fn(item) { item != [] })
     |> list.try_map(fn(item) {
-      let [regex.Match(_, [option.Some(amount_string), option.Some(unit)])] =
-        item
-      try amount = int.parse(amount_string)
-      try #(unit, _) =
-        list.find(units, fn(item) { list.contains(item.1, unit) })
-      #(amount, unit)
-      |> Ok
+      case item {
+        [regex.Match(_, [option.Some(amount_string), option.Some(unit)])] -> {
+          try amount = int.parse(amount_string)
+          try #(unit, _) =
+            list.find(units, fn(item) { list.contains(item.1, unit) })
+          #(amount, unit)
+          |> Ok
+        }
+        _ -> Error(Nil)
+      }
     })
   {
     Ok(values) ->
