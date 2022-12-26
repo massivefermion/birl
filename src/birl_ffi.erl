@@ -10,12 +10,12 @@ to_parts(Timestmap) ->
     calendar:system_time_to_universal_time(Timestmap, millisecond).
 
 to_iso(Timestmap) ->
-    {{Year, Month, Day}, {Hour, Min, Sec}} = to_parts(Timestmap),
-    MilliSec = Timestmap rem 1000,
+    {{Year, Month, Day}, {Hour, Minute, Second}} = to_parts(Timestmap),
+    MilliSecond = Timestmap rem 1000,
     iolist_to_binary(
         io_lib:format(
             "~4.10.0B-~2.10.0B-~2.10.0BT~2.10.0B:~2.10.0B:~2.10.0B.~3.10.0BZ",
-            [Year, Month, Day, Hour, Min, Sec, MilliSec]
+            [Year, Month, Day, Hour, Minute, Second, MilliSecond]
         )
     ).
 
