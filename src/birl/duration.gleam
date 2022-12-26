@@ -1,5 +1,8 @@
 import gleam/int
 import gleam/list
+import gleam/regex
+import gleam/string
+import gleam/option
 
 pub type Duration {
   Duration(Int)
@@ -30,9 +33,9 @@ const month = 2_592_000_000
 
 const year = 31_536_000_000
 
-const accurate_year = 31_556_952_000
-
 const accurate_month = 26_297_460_00
+
+const accurate_year = 31_556_952_000
 
 /// Use this if you need short durations where a year just means 365 days and a month just means 30 days
 pub fn new(values: List(#(Int, Unit))) -> Duration {
@@ -120,6 +123,101 @@ pub fn accurate_decompose(duration: Duration) -> List(#(Int, Unit)) {
     #(remaining, MilliSecond),
   ]
   |> list.filter(fn(item) { item.0 > 0 })
+}
+
+const year_units = ["y", "year", "years"]
+
+const month_units = ["mon", "month", "months"]
+
+const week_units = ["w", "week", "weeks"]
+
+const day_units = ["d", "day", "days"]
+
+const hour_units = ["h", "hour", "hours"]
+
+const minute_units = ["m", "min", "minute", "minutes"]
+
+const second_units = ["s", "sec", "secs", "second", "seconds"]
+
+const milli_second_units = [
+  "ms", "msec", "msecs", "millisecond", "milliseconds",
+]
+
+const units = [
+  #(Year, year_units),
+  #(Month, month_units),
+  #(Week, week_units),
+  #(Day, day_units),
+  #(Hour, hour_units),
+  #(Minute, minute_units),
+  #(Second, second_units),
+  #(MilliSecond, milli_second_units),
+]
+
+const pattern = "(\\d+)\\s*(\\w+)"
+
+/// You can use this function to create a new duration using expressions like:
+///
+///     "accurate: 1 Year + 2days + 152M + 25 years + 25secs"
+///
+/// where the units are:
+///
+///     Year:         y, Y, YEAR, years, Years, ...
+///
+///     Month:        mon, Month, mONths, ...
+///
+///     Week:         w, W, Week, weeks, ...
+///
+///     Day:          d, D, day, Days, ...
+///
+///     Hour:         h, H, Hour, Hours, ...
+///
+///     Minute:       m, M, Min, minute, Minutes, ...
+///
+///     Second:       s, S, sec, Secs, second, Seconds, ...
+///
+///     MilliSecond:  ms, Msec, mSecs, milliSecond, MilliSecond, ...
+///
+/// Specifying `accurate:` is equivalent to using `accurate_new`.
+pub fn parse(expression: String) -> Result(Duration, Nil) {
+  assert Ok(re) = regex.from_string(pattern)
+
+  let #(accurate, expression) = case
+    string.starts_with(expression, "accurate:")
+  {
+    True -> {
+      let [_, expression] = string.split(expression, ":")
+      #(True, expression)
+    }
+    False -> #(False, expression)
+  }
+
+  case
+    expression
+    |> string.split("+")
+    |> list.map(string.trim)
+    |> list.map(string.lowercase)
+    |> list.map(regex.scan(re, _))
+    |> list.filter(fn(item) { item != [] })
+    |> list.try_map(fn(item) {
+      let [regex.Match(_, [option.Some(amount_string), option.Some(unit)])] =
+        item
+      try amount = int.parse(amount_string)
+      try #(unit, _) =
+        list.find(units, fn(item) { list.contains(item.1, unit) })
+      #(amount, unit)
+      |> Ok
+    })
+  {
+    Ok(values) ->
+      case accurate {
+        True -> accurate_new(values)
+        False -> new(values)
+      }
+      |> Ok
+
+    Error(Nil) -> Error(Nil)
+  }
 }
 
 fn extract(duration: Int, unit: Int) -> #(Int, Int) {
