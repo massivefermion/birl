@@ -48,14 +48,12 @@ pub fn from_parts(date: #(Int, Int, Int), time: #(Int, Int, Int)) -> Time {
       |> string_builder.append(".000Z")
   }
 
-  case
+  assert Ok(value) =
     string_builder.join([string_date, string_time], "T")
     |> string_builder.to_string
     |> from_iso
-  {
-    Ok(value) -> value
-    Error(Nil) -> Time(0, option.None)
-  }
+
+  value
 }
 
 pub fn to_iso(value: Time) -> String {
@@ -67,17 +65,14 @@ pub fn to_iso(value: Time) -> String {
 const pattern = "\\d{4}-\\d{1,2}-\\d{1,2}T\\d{1,2}:\\d{1,2}:\\d{1,2}.\\d{3}Z"
 
 pub fn from_iso(value: String) -> Result(Time, Nil) {
-  case regex.from_string(pattern) {
-    Ok(pattern) ->
-      case regex.check(pattern, value) {
-        True ->
-          value
-          |> ffi_from_iso
-          |> Time(option.None)
-          |> Ok
-        False -> Error(Nil)
-      }
-    Error(_) -> Error(Nil)
+  assert Ok(pattern) = regex.from_string(pattern)
+  case regex.check(pattern, value) {
+    True ->
+      value
+      |> ffi_from_iso
+      |> Time(option.None)
+      |> Ok
+    False -> Error(Nil)
   }
 }
 
