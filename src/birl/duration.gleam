@@ -19,23 +19,23 @@ pub type Unit {
   Year
 }
 
-const second = 1_000
+const second = 1_000_000
 
-const minute = 60_000
+const minute = 60_000_000
 
-const hour = 3_600_000
+const hour = 3_600_000_000
 
-const day = 86_400_000
+const day = 86_400_000_000
 
-const week = 604_800_000
+const week = 604_800_000_000
 
-const month = 2_592_000_000
+const month = 2_592_000_000_000
 
-const year = 31_536_000_000
+const year = 31_536_000_000_000
 
-const accurate_month = 26_297_460_00
+const accurate_month = 2_629_746_000_000
 
-const accurate_year = 31_556_952_000
+const accurate_year = 31_556_952_000_000
 
 /// Use this if you need short durations where a year just means 365 days and a month just means 30 days
 pub fn new(values: List(#(Int, Unit))) -> Duration {
