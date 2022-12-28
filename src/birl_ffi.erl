@@ -1,17 +1,22 @@
 -module(birl_ffi).
 
--export([now/0, to_parts/1, to_iso/1, from_iso/1, monotonic_now/0]).
+-export([now/0, monotonic_now/0, to_parts/1, to_iso/1, from_iso/1, get_weekday/1]).
 
 -define(DaysInMonths, [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31]).
 
-now() -> os:system_time(millisecond).
+now() -> os:system_time(microsecond).
+
+monotonic_now() ->
+    StartTime = erlang:system_info(start_time),
+    CurrentTime = erlang:monotonic_time(),
+    (CurrentTime - StartTime) div 1_000.
 
 to_parts(Timestmap) ->
-    calendar:system_time_to_universal_time(Timestmap, millisecond).
+    calendar:system_time_to_universal_time(Timestmap, microsecond).
 
 to_iso(Timestmap) ->
     {{Year, Month, Day}, {Hour, Minute, Second}} = to_parts(Timestmap),
-    MilliSecond = Timestmap rem 1000,
+    MilliSecond = (Timestmap rem 1_000_000) div 1_000,
     iolist_to_binary(
         io_lib:format(
             "~4.10.0B-~2.10.0B-~2.10.0BT~2.10.0B:~2.10.0B:~2.10.0B.~3.10.0BZ",
@@ -34,7 +39,13 @@ from_iso(ISODate) ->
     DaysInYears = calculate_days_from_year(Year - 1, 0),
     DaysInMonths = calculate_days_from_month(Year, Month - 1, 0),
     Days = DaysInYears + DaysInMonths + Day - 1,
-    (((Days * 3600 * 24) + (Hours * 3600) + (Minutes * 60) + Seconds) * 1000) + MilliSeconds.
+    TotalMilliSeconds =
+        ((((Days * 3600 * 24) + (Hours * 3600) + (Minutes * 60) + Seconds) * 1000) + MilliSeconds),
+    TotalMilliSeconds * 1000.
+
+get_weekday(Timestamp) ->
+    {Date, _} = to_parts(Timestamp),
+    calendar:day_of_the_week(Date) - 1.
 
 calculate_days_from_year(1969, Days) ->
     Days;
@@ -55,5 +66,3 @@ calculate_days_from_month(Year, Month, Days) ->
         false ->
             calculate_days_from_month(Year, Month - 1, Days + lists:nth(Month, ?DaysInMonths))
     end.
-
-monotonic_now() -> os:perf_counter(millisecond).
