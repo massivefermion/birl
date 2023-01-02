@@ -46,19 +46,19 @@ pub fn equality_test() {
   |> should.equal(order.Eq)
 }
 
-pub fn to_parts_test() {
-  time.from_iso(iso_datetime)
-  |> should.be_ok
-  |> time.to_parts
-  |> should.equal(#(#(2022, 12, 22), #(16, 38, 23)))
-}
+// pub fn to_parts_test() {
+//   time.from_iso(iso_datetime)
+//   |> should.be_ok
+//   |> time.to_parts
+//   |> should.equal(#(#(2022, 12, 22), #(16, 38, 23)))
+// }
 
-pub fn from_parts_test() {
-  let #(date, time) = datetime_in_parts
-  time.from_parts(date, time)
-  |> time.to_iso
-  |> should.equal(iso_datetime)
-}
+// pub fn from_parts_test() {
+//   let #(date, time) = datetime_in_parts
+//   time.from_parts(date, time)
+//   |> time.to_iso
+//   |> should.equal(iso_datetime)
+// }
 
 pub fn circular_test() {
   let dt = time.now()

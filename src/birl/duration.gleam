@@ -9,6 +9,7 @@ pub type Duration {
 }
 
 pub type Unit {
+  MicroSecond
   MilliSecond
   Second
   Minute
@@ -18,6 +19,8 @@ pub type Unit {
   Month
   Year
 }
+
+const milli_second = 1_000
 
 const second = 1_000_000
 
@@ -45,7 +48,8 @@ pub fn new(values: List(#(Int, Unit))) -> Duration {
     fn(total, current) {
       let #(amount, unit) = current
       case unit {
-        MilliSecond -> total + amount
+        MicroSecond -> total + amount
+        MilliSecond -> total + amount * milli_second
         Second -> total + amount * second
         Minute -> total + amount * minute
         Hour -> total + amount * hour
@@ -67,7 +71,8 @@ pub fn accurate_new(values: List(#(Int, Unit))) -> Duration {
     fn(total, current) {
       let #(amount, unit) = current
       case unit {
-        MilliSecond -> total + amount
+        MicroSecond -> total + amount
+        MilliSecond -> total + amount * milli_second
         Second -> total + amount * second
         Minute -> total + amount * minute
         Hour -> total + amount * hour
@@ -84,12 +89,14 @@ pub fn accurate_new(values: List(#(Int, Unit))) -> Duration {
 /// Use this if you need short durations where a year just means 365 days and a month just means 30 days
 pub fn decompose(duration: Duration) -> List(#(Int, Unit)) {
   let Duration(value) = duration
-  let #(years, remaining) = extract(value, year)
+  let absolute_value = int.absolute_value(value)
+  let #(years, remaining) = extract(absolute_value, year)
   let #(months, remaining) = extract(remaining, month)
   let #(days, remaining) = extract(remaining, day)
   let #(hours, remaining) = extract(remaining, hour)
   let #(minutes, remaining) = extract(remaining, minute)
   let #(seconds, remaining) = extract(remaining, second)
+  let #(milli_seconds, remaining) = extract(remaining, milli_second)
 
   [
     #(years, Year),
@@ -98,20 +105,29 @@ pub fn decompose(duration: Duration) -> List(#(Int, Unit)) {
     #(hours, Hour),
     #(minutes, Minute),
     #(seconds, Second),
-    #(remaining, MilliSecond),
+    #(milli_seconds, MilliSecond),
+    #(remaining, MicroSecond),
   ]
   |> list.filter(fn(item) { item.0 > 0 })
+  |> list.map(fn(item) {
+    case value < 0 {
+      True -> #(-1 * item.0, item.1)
+      False -> item
+    }
+  })
 }
 
 /// Use this if you need very long durations where small inaccuracies could lead to large errors
 pub fn accurate_decompose(duration: Duration) -> List(#(Int, Unit)) {
   let Duration(value) = duration
-  let #(years, remaining) = extract(value, accurate_year)
+  let absolute_value = int.absolute_value(value)
+  let #(years, remaining) = extract(absolute_value, accurate_year)
   let #(months, remaining) = extract(remaining, accurate_month)
   let #(days, remaining) = extract(remaining, day)
   let #(hours, remaining) = extract(remaining, hour)
   let #(minutes, remaining) = extract(remaining, minute)
   let #(seconds, remaining) = extract(remaining, second)
+  let #(milli_seconds, remaining) = extract(remaining, milli_second)
 
   [
     #(years, Year),
@@ -120,9 +136,16 @@ pub fn accurate_decompose(duration: Duration) -> List(#(Int, Unit)) {
     #(hours, Hour),
     #(minutes, Minute),
     #(seconds, Second),
-    #(remaining, MilliSecond),
+    #(milli_seconds, MilliSecond),
+    #(remaining, MicroSecond),
   ]
   |> list.filter(fn(item) { item.0 > 0 })
+  |> list.map(fn(item) {
+    case value < 0 {
+      True -> #(-1 * item.0, item.1)
+      False -> item
+    }
+  })
 }
 
 const year_units = ["y", "year", "years"]
