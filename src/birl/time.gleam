@@ -1,3 +1,4 @@
+import gleam/io
 import gleam/int
 import gleam/list
 import gleam/order
@@ -55,7 +56,15 @@ pub fn from_parts(
   date: #(Int, Int, Int),
   time: #(Int, Int, Int),
   offset: String,
-) -> Time {
+) -> Result(Time, Nil) {
+  io.println(offset)
+
+  try offset_number = parse_offset(offset)
+  io.debug(offset_number)
+  try offset = generate_offset(offset_number)
+
+  io.println(offset)
+
   let string_date = case date {
     #(year, month, day) ->
       [int.to_string(year), int.to_string(month), int.to_string(day)]
@@ -63,20 +72,24 @@ pub fn from_parts(
       |> string_builder.join("-")
   }
 
+  io.debug(string_date)
+
   let string_time = case time {
     #(hour, minute, second) ->
       [int.to_string(hour), int.to_string(minute), int.to_string(second)]
       |> list.map(string_builder.from_string)
       |> string_builder.join(":")
-      |> string_builder.append(".000Z")
+      |> string_builder.append(".000")
+      |> string_builder.append(offset)
   }
 
-  assert Ok(value) =
-    string_builder.join([string_date, string_time], "T")
-    |> string_builder.to_string
-    |> from_iso
+  io.debug(string_time)
 
-  value
+  string_builder.join([string_date, string_time], "T")
+  |> string_builder.to_string
+  |> io.debug
+  |> from_iso
+  |> io.debug
 }
 
 pub fn to_iso(value: Time) -> String {
@@ -85,10 +98,12 @@ pub fn to_iso(value: Time) -> String {
   }
 }
 
-const iso_pattern = "\\d{4}-\\d{1,2}-\\d{1,2}T\\d{1,2}:\\d{1,2}:\\d{1,2}.\\d{3}Z"
-
 pub fn from_iso(value: String) -> Result(Time, Nil) {
-  assert Ok(pattern) = regex.from_string(iso_pattern)
+  assert Ok(pattern) =
+    regex.from_string(
+      "\\d{4}-\\d{1,2}-\\d{1,2}T\\d{1,2}:\\d{1,2}:\\d{1,2}.\\d{3}\\+|\\-\\d{2}:\\d{2}",
+    )
+  io.println(value)
   case regex.check(pattern, value) {
     True ->
       value
@@ -169,36 +184,42 @@ pub fn get_weekday(value: Time) -> WeekDay {
   }
 }
 
-const pattern = "(\\+|\\-)"
-
 fn parse_offset(offset: String) -> Result(Int, Nil) {
-  assert Ok(re) = regex.from_string(pattern)
+  assert Ok(re) = regex.from_string("[+-]")
   try #(sign, offset) = case regex.split(re, offset) {
     ["", "+", offset] -> Ok(#(1, offset))
     ["", "-", offset] -> Ok(#(-1, offset))
     [_] -> Ok(#(1, offset))
     _ -> Error(Nil)
   }
+
   case string.split(offset, ":") {
     [hour_str, minute_str] -> {
       try hour = int.parse(hour_str)
       try minute = int.parse(minute_str)
+      io.println("@@@@@@@@@@@@@@@1")
       Ok(sign * { hour * 60 + minute } * 60 * 1_000_000)
     }
     [offset] ->
       case string.length(offset) {
         1 | 2 -> {
+          io.println("@@@@@@@@@@@@@@@2")
           try hour = int.parse(offset)
           Ok(sign * hour * 3600 * 1_000_000)
         }
         3 -> {
+          io.println("@@@@@@@@@@@@@@@3")
           assert Ok(hour_str) = string.first(offset)
           let minute_str = string.slice(offset, 1, 2)
           try hour = int.parse(hour_str)
           try minute = int.parse(minute_str)
+          io.debug(hour)
+          io.debug(minute)
+          io.debug(sign)
           Ok(sign * { hour * 60 + minute } * 60 * 1_000_000)
         }
         4 -> {
+          io.println("@@@@@@@@@@@@@@@4")
           let hour_str = string.slice(offset, 0, 2)
           let minute_str = string.slice(offset, 2, 2)
           try hour = int.parse(hour_str)
@@ -219,14 +240,36 @@ pub fn generate_offset(offset: Int) -> Result(String, Nil) {
   {
     [#(hour, duration.Hour), #(minute, duration.Minute)] ->
       [
-        int.to_string(hour),
+        case hour > 0 {
+          True ->
+            string.concat([
+              "+",
+              hour
+              |> int.to_string
+              |> string.pad_left(2, "0"),
+            ])
+          False ->
+            string.concat([
+              "-",
+              hour
+              |> int.absolute_value
+              |> int.to_string
+              |> string.pad_left(2, "0"),
+            ])
+        },
         minute
         |> int.absolute_value
-        |> int.to_string,
+        |> int.to_string
+        |> string.pad_left(2, "0"),
       ]
       |> string.join(":")
       |> Ok
-    _ -> Error(Nil)
+    parts -> {
+      io.println("@@@@@@@@@@@@@@@@@@@@@@@@@@@")
+      io.debug(parts)
+      io.println("@@@@@@@@@@@@@@@@@@@@@@@@@@@")
+      Error(Nil)
+    }
   }
 }
 

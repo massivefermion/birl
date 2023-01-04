@@ -177,8 +177,6 @@ const units = [
   #(MilliSecond, milli_second_units),
 ]
 
-const pattern = "(\\d+)\\s*(\\w+)"
-
 /// You can use this function to create a new duration using expressions like:
 ///
 ///     "accurate: 1 Year + 2days + 152M + 25 years + 25secs"
@@ -203,7 +201,7 @@ const pattern = "(\\d+)\\s*(\\w+)"
 ///
 /// Specifying `accurate:` is equivalent to using `accurate_new`.
 pub fn parse(expression: String) -> Result(Duration, Nil) {
-  assert Ok(re) = regex.from_string(pattern)
+  assert Ok(re) = regex.from_string("(\\d+)\\s*(\\w+)")
 
   let #(accurate, expression) = case
     string.starts_with(expression, "accurate:")
