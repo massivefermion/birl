@@ -199,6 +199,7 @@ const units = [
 ///
 ///     MilliSecond:  ms, Msec, mSecs, milliSecond, MilliSecond, ...
 ///
+/// Numbers with no unit are considered as microseconds.
 /// Specifying `accurate:` is equivalent to using `accurate_new`.
 pub fn parse(expression: String) -> Result(Duration, Nil) {
   assert Ok(re) = regex.from_string("(\\d+)\\s*(\\w+)")

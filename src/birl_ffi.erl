@@ -1,10 +1,19 @@
 -module(birl_ffi).
 
--export([now/0, monotonic_now/0, to_parts/1, to_iso/1, from_iso/1, get_weekday/1]).
+-export([now/0, local_offset/0, monotonic_now/0, to_parts/1, from_parts/2, to_iso/1, from_iso/1, weekday/1]).
 
 -define(DaysInMonths, [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31]).
 
 now() -> os:system_time(microsecond).
+
+local_offset() ->
+    Timestamp = erlang:timestamp(),
+    {{_, _, LD}, {LH, LM, _}} = calendar:now_to_local_time(Timestamp),
+    {{_, _, UD}, {UH, UM, _}} = calendar:now_to_universal_time(Timestamp),
+    if
+        LD - UD == 0 -> (LH - UH) * 60 + LM - UM;
+        true->  (LD - UD) * ((23 - UH) * 60 + (60 - UM) + LH * 60 + LM)
+    end. 
 
 monotonic_now() ->
     StartTime = erlang:system_info(start_time),
@@ -13,6 +22,14 @@ monotonic_now() ->
 
 to_parts(Timestmap) ->
     calendar:system_time_to_universal_time(Timestmap, microsecond).
+
+from_parts(Parts, _) ->
+    {{Year, Month, Day}, {Hour, Minute, Second}} = Parts,
+    DaysInYears = calculate_days_from_year(Year - 1, 0),
+    DaysInMonths = calculate_days_from_month(Year, Month - 1, 0),
+    Days = DaysInYears + DaysInMonths + Day - 1,
+    ((Days * 3600 * 24) + (Hour * 3600) + (Minute * 60) + Second) * 1_000_000.
+
 
 to_iso(Timestmap) ->
     {{Year, Month, Day}, {Hour, Minute, Second}} = to_parts(Timestmap),
@@ -43,7 +60,7 @@ from_iso(ISODate) ->
         ((((Days * 3600 * 24) + (Hours * 3600) + (Minutes * 60) + Seconds) * 1000) + MilliSeconds),
     TotalMilliSeconds * 1000.
 
-get_weekday(Timestamp) ->
+weekday(Timestamp) ->
     {Date, _} = to_parts(Timestamp),
     calendar:day_of_the_week(Date) - 1.
 

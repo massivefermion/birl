@@ -22,8 +22,16 @@ pub type WeekDay {
   Sunday
 }
 
-/// use this to get the current time in utc
+/// use this to get the current time in the local timezone offset
 pub fn now() {
+  let now = ffi_now()
+  let offset_in_minutes = ffi_local_offset()
+  let monotonic_now = ffi_monotonic_now()
+  Time(now, offset_in_minutes * 60_000_000, option.Some(monotonic_now))
+}
+
+/// use this to get the current time in utc
+pub fn utc_now() {
   let now = ffi_now()
   let monotonic_now = ffi_monotonic_now()
   Time(now, 0, option.Some(monotonic_now))
@@ -52,18 +60,53 @@ pub fn to_parts(value: Time) -> #(#(Int, Int, Int), #(Int, Int, Int), String) {
   }
 }
 
+const days_in_months = [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31]
+
 pub fn from_parts(
   date: #(Int, Int, Int),
   time: #(Int, Int, Int),
   offset: String,
 ) -> Result(Time, Nil) {
+  try offset_number = parse_offset(offset)
+  case date.1 < 1 || date.1 > 12 {
+    True -> Error(Nil)
+    False -> {
+      assert Ok(days_in_month) = list.at(days_in_months, date.1 - 1)
+      case date.2 < 1 || date.2 > days_in_month {
+        True -> Error(Nil)
+        False ->
+          case
+            time.0 < 0 || time.0 > 23 || time.1 < 0 || time.1 > 60 || time.2 < 0 || time.2 > 60
+          {
+            True -> Error(Nil)
+            False -> {
+              let now = ffi_from_parts(#(date, time), offset_number)
+              now
+              |> Time(offset_number, option.None)
+              |> Ok
+            }
+          }
+      }
+    }
+  }
+}
+
+pub fn from_parts_dis(
+  date: #(Int, Int, Int),
+  time: #(Int, Int, Int),
+  offset: String,
+) -> Result(Time, Nil) {
+  io.println("flag 1")
   io.println(offset)
+  io.println("flag 2")
 
   try offset_number = parse_offset(offset)
   io.debug(offset_number)
   try offset = generate_offset(offset_number)
+  io.println("flag 3")
 
   io.println(offset)
+  io.println("flag 4")
 
   let string_date = case date {
     #(year, month, day) ->
@@ -71,8 +114,11 @@ pub fn from_parts(
       |> list.map(string_builder.from_string)
       |> string_builder.join("-")
   }
+  io.println("flag 5")
 
   io.debug(string_date)
+
+  io.println("flag 6")
 
   let string_time = case time {
     #(hour, minute, second) ->
@@ -83,7 +129,11 @@ pub fn from_parts(
       |> string_builder.append(offset)
   }
 
+  io.println("flag 7")
+
   io.debug(string_time)
+
+  io.println("flag 8")
 
   string_builder.join([string_date, string_time], "T")
   |> string_builder.to_string
@@ -175,10 +225,10 @@ pub fn subtract(value: Time, duration: duration.Duration) -> Time {
   }
 }
 
-pub fn get_weekday(value: Time) -> WeekDay {
+pub fn weekday(value: Time) -> WeekDay {
   case value {
     Time(wall_time: t, offset: o, monotonic_time: _) -> {
-      assert Ok(weekday) = list.at(weekdays, ffi_get_weekday(t + o))
+      assert Ok(weekday) = list.at(weekdays, ffi_weekday(t + o))
       weekday
     }
   }
@@ -301,11 +351,17 @@ if erlang {
   external fn ffi_now() -> Int =
     "birl_ffi" "now"
 
+  external fn ffi_local_offset() -> Int =
+    "birl_ffi" "local_offset"
+
   external fn ffi_monotonic_now() -> Int =
     "birl_ffi" "monotonic_now"
 
   external fn ffi_to_parts(Int) -> #(#(Int, Int, Int), #(Int, Int, Int)) =
     "birl_ffi" "to_parts"
+
+  external fn ffi_from_parts(#(#(Int, Int, Int), #(Int, Int, Int)), Int) -> Int =
+    "birl_ffi" "from_parts"
 
   external fn ffi_to_iso(Int) -> String =
     "birl_ffi" "to_iso"
@@ -313,13 +369,16 @@ if erlang {
   external fn ffi_from_iso(String) -> Int =
     "birl_ffi" "from_iso"
 
-  external fn ffi_get_weekday(Int) -> Int =
-    "birl_ffi" "get_weekday"
+  external fn ffi_weekday(Int) -> Int =
+    "birl_ffi" "weekday"
 }
 
 if javascript {
   external fn ffi_now() -> Int =
     "../birl_ffi.mjs" "now"
+
+  external fn ffi_local_offset() -> Int =
+    "../birl_ffi.mjs" "local_offset"
 
   external fn ffi_monotonic_now() -> Int =
     "../birl_ffi.mjs" "monotonic_now"
@@ -327,12 +386,15 @@ if javascript {
   external fn ffi_to_parts(Int) -> #(#(Int, Int, Int), #(Int, Int, Int)) =
     "../birl_ffi.mjs" "to_parts"
 
+  external fn ffi_from_parts(#(#(Int, Int, Int), #(Int, Int, Int)), Int) -> Int =
+    "../birl_ffi.mjs" "from_parts"
+
   external fn ffi_to_iso(Int) -> String =
     "../birl_ffi.mjs" "to_iso"
 
   external fn ffi_from_iso(String) -> Int =
     "../birl_ffi.mjs" "from_iso"
 
-  external fn ffi_get_weekday(Int) -> Int =
-    "../birl_ffi.mjs" "get_weekday"
+  external fn ffi_weekday(Int) -> Int =
+    "../birl_ffi.mjs" "weekday"
 }
