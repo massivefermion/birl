@@ -1,3 +1,7 @@
+import { Error } from './gleam.mjs'
+
+const Nil = undefined
+
 export function now() {
   return Date.now() * 1000
 }
@@ -38,6 +42,7 @@ export function to_iso(timestamp) {
 
 export function from_iso(iso_date) {
   const date = new Date(iso_date)
+  if (isNaN(date)) return new Error(Nil)
   return date.getTime() * 1000
 }
 

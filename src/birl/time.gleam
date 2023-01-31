@@ -96,19 +96,10 @@ pub fn to_iso(value: Time) -> String {
 }
 
 pub fn from_iso(value: String) -> Result(Time, Nil) {
-  assert Ok(pattern) =
-    regex.from_string(
-      "\\d{4}-?\\d{1,2}-?\\d{1,2}(T\\d{1,2}:?\\d{1,2}:?(\\d{1,2}(.\\d{3}(\\+\\d{2}:\\d{2}|\\-\\d{2}:\\d{2}|Z)?)?)?)?",
-    )
-
-  case regex.check(pattern, value) {
-    True ->
-      value
-      |> ffi_from_iso
-      |> Time(0, option.None)
-      |> Ok
-    False -> Error(Nil)
-  }
+  value
+  |> ffi_from_iso
+  |> Time(0, option.None)
+  |> Ok
 }
 
 pub fn compare(a: Time, b: Time) -> order.Order {
@@ -222,39 +213,43 @@ fn parse_offset(offset: String) -> Result(Int, Nil) {
   }
 }
 
-pub fn generate_offset(offset: Int) -> Result(String, Nil) {
-  case
-    [#(offset, duration.MicroSecond)]
-    |> duration.new
-    |> duration.decompose
-  {
-    [#(hour, duration.Hour), #(minute, duration.Minute)] ->
-      [
-        case hour > 0 {
-          True ->
-            string.concat([
-              "+",
-              hour
-              |> int.to_string
-              |> string.pad_left(2, "0"),
-            ])
-          False ->
-            string.concat([
-              "-",
-              hour
-              |> int.absolute_value
-              |> int.to_string
-              |> string.pad_left(2, "0"),
-            ])
-        },
-        minute
-        |> int.absolute_value
-        |> int.to_string
-        |> string.pad_left(2, "0"),
-      ]
-      |> string.join(":")
-      |> Ok
-    _ -> Error(Nil)
+fn generate_offset(offset: Int) -> Result(String, Nil) {
+  case offset {
+    0 -> Ok("+00:00")
+    _ ->
+      case
+        [#(offset, duration.MicroSecond)]
+        |> duration.new
+        |> duration.decompose
+      {
+        [#(hour, duration.Hour), #(minute, duration.Minute)] ->
+          [
+            case hour > 0 {
+              True ->
+                string.concat([
+                  "+",
+                  hour
+                  |> int.to_string
+                  |> string.pad_left(2, "0"),
+                ])
+              False ->
+                string.concat([
+                  "-",
+                  hour
+                  |> int.absolute_value
+                  |> int.to_string
+                  |> string.pad_left(2, "0"),
+                ])
+            },
+            minute
+            |> int.absolute_value
+            |> int.to_string
+            |> string.pad_left(2, "0"),
+          ]
+          |> string.join(":")
+          |> Ok
+        _ -> Error(Nil)
+      }
   }
 }
 

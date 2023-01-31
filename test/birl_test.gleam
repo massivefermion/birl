@@ -54,8 +54,7 @@ pub fn to_parts_test() {
 }
 
 pub fn from_parts_test() {
-  let #(date, time) = datetime_in_parts
-  time.from_parts(date, time, "0")
+  time.from_parts(datetime_in_parts.0, datetime_in_parts.1, "0")
   |> should.be_ok
   |> time.to_iso
   |> should.equal(iso_datetime)
