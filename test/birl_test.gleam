@@ -4,7 +4,7 @@ import gleeunit/should
 import birl/time
 import birl/duration
 
-const iso_datetime = "2022-12-22T16:38:23.000Z"
+const iso_datetime = "2022-12-22T16:38:23.000+03:30"
 
 const datetime_in_parts = #(#(2022, 12, 22), #(16, 38, 23))
 
@@ -13,16 +13,16 @@ pub fn main() {
 }
 
 pub fn iso_test() {
-  time.from_iso(iso_datetime)
+  time.from_iso8601(iso_datetime)
   |> should.be_ok
-  |> time.to_iso
+  |> time.to_iso8601
   |> should.equal(iso_datetime)
 }
 
 pub fn now_test() {
   time.now()
-  |> time.to_iso
-  |> time.from_iso
+  |> time.to_iso8601
+  |> time.from_iso8601
   |> should.be_ok
 }
 
@@ -47,16 +47,16 @@ pub fn equality_test() {
 }
 
 pub fn to_parts_test() {
-  time.from_iso(iso_datetime)
+  time.from_iso8601(iso_datetime)
   |> should.be_ok
   |> time.to_parts
-  |> should.equal(#(#(2022, 12, 22), #(16, 38, 23), "+00:00"))
+  |> should.equal(#(#(2022, 12, 22), #(16, 38, 23), "+03:30"))
 }
 
 pub fn from_parts_test() {
-  time.from_parts(datetime_in_parts.0, datetime_in_parts.1, "0")
+  time.from_parts(datetime_in_parts.0, datetime_in_parts.1, "+03:30")
   |> should.be_ok
-  |> time.to_iso
+  |> time.to_iso8601
   |> should.equal(iso_datetime)
 }
 

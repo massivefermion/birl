@@ -1,7 +1,3 @@
-import { Error } from './gleam.mjs'
-
-const Nil = undefined
-
 export function now() {
   return Date.now() * 1000
 }
@@ -24,29 +20,28 @@ export function to_parts(timestamp) {
 }
 
 export function from_parts(parts, offset) {
-  const date = new Date(
-    parts[0][0],
-    parts[0][1] - 1,
-    parts[0][2],
-    parts[1][0],
-    parts[1][1],
-    parts[1][2]
-  )
-  return date.getTime() * 1000 + offset
+  const date = new Date()
+  date.setUTCFullYear(parts[0][0])
+  date.setUTCMonth(parts[0][1] - 1)
+  date.setUTCDate(parts[0][2])
+  date.setUTCHours(parts[1][0])
+  date.setUTCMinutes(parts[1][1])
+  date.setUTCSeconds(parts[1][2])
+  return date.getTime() * 1000 - offset
 }
 
-export function to_iso(timestamp) {
-  const date = new Date(timestamp / 1000)
-  return date.toISOString()
-}
-
-export function from_iso(iso_date) {
-  const date = new Date(iso_date)
-  if (isNaN(date)) return new Error(Nil)
-  return date.getTime() * 1000
-}
-
-export function weekday(timestamp) {
-  const date = new Date(timestamp / 1000)
+export function weekday(timestamp, offset) {
+  const date = new Date((timestamp - offset) / 1000)
   return date.getDay()
 }
+
+// export function to_iso(timestamp) {
+//   const date = new Date(timestamp / 1000)
+//   return date.toISOString()
+// }
+
+// export function from_iso(iso_date) {
+//   const date = new Date(iso_date)
+//   if (isNaN(date)) return new Error(Nil)
+//   return date.getTime() * 1000
+// }

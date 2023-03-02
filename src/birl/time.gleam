@@ -2,6 +2,7 @@ import gleam/int
 import gleam/list
 import gleam/order
 import gleam/regex
+import gleam/result
 import gleam/string
 import gleam/option
 import birl/duration
@@ -41,7 +42,7 @@ pub fn utc_now() {
 ///
 /// `"+330", "03:30", "-8:00","-7", "-0400", "03"`
 pub fn now_with_offset(offset: String) -> Result(Time, Nil) {
-  try offset = parse_offset(offset)
+  use offset <- result.then(parse_offset(offset))
   let now = ffi_now()
   let monotonic_now = ffi_monotonic_now()
   Time(now, offset, option.Some(monotonic_now))
@@ -51,55 +52,120 @@ pub fn now_with_offset(offset: String) -> Result(Time, Nil) {
 pub fn to_parts(value: Time) -> #(#(Int, Int, Int), #(Int, Int, Int), String) {
   case value {
     Time(wall_time: t, offset: o, monotonic_time: _) -> {
-      let #(date, time) = ffi_to_parts(t)
-      assert Ok(offset) = generate_offset(o)
+      let #(date, time) = ffi_to_parts(t + o)
+      let assert Ok(offset) = generate_offset(o)
       #(date, time, offset)
     }
   }
 }
 
-const days_in_months = [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31]
-
 pub fn from_parts(
   date: #(Int, Int, Int),
   time: #(Int, Int, Int),
-  offset: String,
+  offset offset: String,
 ) -> Result(Time, Nil) {
-  try offset_number = parse_offset(offset)
-  case date.1 < 1 || date.1 > 12 {
-    True -> Error(Nil)
-    False -> {
-      assert Ok(days_in_month) = list.at(days_in_months, date.1 - 1)
-      case date.2 < 1 || date.2 > days_in_month {
-        True -> Error(Nil)
-        False ->
-          case
-            time.0 < 0 || time.0 > 23 || time.1 < 0 || time.1 > 60 || time.2 < 0 || time.2 > 60
-          {
-            True -> Error(Nil)
-            False -> {
-              let now = ffi_from_parts(#(date, time), offset_number)
-              now
-              |> Time(offset_number, option.None)
-              |> Ok
-            }
-          }
+  use offset_number <- result.then(parse_offset(offset))
+  ffi_from_parts(#(date, time), offset_number)
+  |> Time(offset_number, option.None)
+  |> Ok
+}
+
+pub fn to_iso8601(value: Time) -> String {
+  let #(#(year, month, day), #(hour, minute, second), offset) = to_parts(value)
+  int.to_string(year) <> "-" <> {
+    month
+    |> int.to_string
+    |> string.pad_left(2, "0")
+  } <> "-" <> {
+    day
+    |> int.to_string
+    |> string.pad_left(2, "0")
+  } <> "T" <> {
+    hour
+    |> int.to_string
+    |> string.pad_left(2, "0")
+  } <> ":" <> {
+    minute
+    |> int.to_string
+    |> string.pad_left(2, "0")
+  } <> ":" <> {
+    second
+    |> int.to_string
+    |> string.pad_left(2, "0")
+  } <> ".000" <> offset
+}
+
+pub fn from_iso8601(value: String) -> Result(Time, Nil) {
+  let assert Ok(offset_pattern) = regex.from_string("(.*)([+|\\-].*)")
+  let value = string.trim(value)
+
+  let #(date_string, offsetted_time_string) = case string.split(value, "T") {
+    [date_string] -> #(date_string, "00")
+    [date_string, offsetted_time_string] -> #(
+      date_string,
+      offsetted_time_string,
+    )
+  }
+
+  let #(time_string, offset_string) = case
+    string.ends_with(offsetted_time_string, "Z")
+  {
+    True -> #(string.drop_right(offsetted_time_string, 1), "+00:00")
+    False ->
+      case regex.scan(offset_pattern, offsetted_time_string) {
+        [regex.Match(_, [option.Some(time_string), option.Some(offset_string)])] -> #(
+          time_string,
+          offset_string,
+        )
+        [] -> {
+          let local_offset_in_minutes = ffi_local_offset()
+          let assert Ok(local_offset_string) =
+            generate_offset(local_offset_in_minutes * 60_000_000)
+
+          #(offsetted_time_string, local_offset_string)
+        }
+      }
+  }
+
+  let date_string = string.replace(date_string, "-", "")
+  let time_string = string.replace(time_string, ":", "")
+
+  let #(time_string, milli_seconds_result) = case
+    string.split(time_string, ".")
+  {
+    [time_string] -> #(time_string, Ok(0))
+    [time_string, milli_seconds_string] -> #(
+      time_string,
+      int.parse(milli_seconds_string),
+    )
+  }
+
+  case milli_seconds_result {
+    Ok(milli_seconds) -> {
+      use [year, month, day] <- result.then(parse_iso_section(
+        date_string,
+        "(\\d{4})(\\d{2})?(\\d{2})?",
+        1,
+      ))
+
+      use [hour, minute, second] <- result.then(parse_iso_section(
+        time_string,
+        "(\\d{2})(\\d{2})?(\\d{2})?",
+        0,
+      ))
+
+      case
+        from_parts(#(year, month, day), #(hour, minute, second), offset_string)
+      {
+        Ok(Time(timestamp, offset, option.None)) ->
+          Ok(Time(timestamp + milli_seconds * 1000, offset, option.None))
+
+        Error(Nil) -> Error(Nil)
       }
     }
-  }
-}
 
-pub fn to_iso(value: Time) -> String {
-  case value {
-    Time(wall_time: t, offset: o, monotonic_time: _) -> ffi_to_iso(t + o)
+    Error(Nil) -> Error(Nil)
   }
-}
-
-pub fn from_iso(value: String) -> Result(Time, Nil) {
-  value
-  |> ffi_from_iso
-  |> Time(0, option.None)
-  |> Ok
 }
 
 pub fn compare(a: Time, b: Time) -> order.Order {
@@ -166,45 +232,45 @@ pub fn subtract(value: Time, duration: duration.Duration) -> Time {
 pub fn weekday(value: Time) -> WeekDay {
   case value {
     Time(wall_time: t, offset: o, monotonic_time: _) -> {
-      assert Ok(weekday) = list.at(weekdays, ffi_weekday(t + o))
+      let assert Ok(weekday) = list.at(weekdays, ffi_weekday(t + o))
       weekday
     }
   }
 }
 
 fn parse_offset(offset: String) -> Result(Int, Nil) {
-  assert Ok(re) = regex.from_string("([+-])")
+  let assert Ok(re) = regex.from_string("([+-])")
 
-  try #(sign, offset) = case regex.split(re, offset) {
+  use #(sign, offset) <- result.then(case regex.split(re, offset) {
     ["", "+", offset] -> Ok(#(1, offset))
     ["", "-", offset] -> Ok(#(-1, offset))
     [_] -> Ok(#(1, offset))
     _ -> Error(Nil)
-  }
+  })
   case string.split(offset, ":") {
     [hour_str, minute_str] -> {
-      try hour = int.parse(hour_str)
-      try minute = int.parse(minute_str)
+      use hour <- result.then(int.parse(hour_str))
+      use minute <- result.then(int.parse(minute_str))
       Ok(sign * { hour * 60 + minute } * 60 * 1_000_000)
     }
     [offset] ->
       case string.length(offset) {
         1 | 2 -> {
-          try hour = int.parse(offset)
+          use hour <- result.then(int.parse(offset))
           Ok(sign * hour * 3600 * 1_000_000)
         }
         3 -> {
-          assert Ok(hour_str) = string.first(offset)
+          let assert Ok(hour_str) = string.first(offset)
           let minute_str = string.slice(offset, 1, 2)
-          try hour = int.parse(hour_str)
-          try minute = int.parse(minute_str)
+          use hour <- result.then(int.parse(hour_str))
+          use minute <- result.then(int.parse(minute_str))
           Ok(sign * { hour * 60 + minute } * 60 * 1_000_000)
         }
         4 -> {
           let hour_str = string.slice(offset, 0, 2)
           let minute_str = string.slice(offset, 2, 2)
-          try hour = int.parse(hour_str)
-          try minute = int.parse(minute_str)
+          use hour <- result.then(int.parse(hour_str))
+          use minute <- result.then(int.parse(minute_str))
           Ok(sign * { hour * 60 + minute } * 60 * 1_000_000)
         }
         _ -> Error(Nil)
@@ -215,7 +281,7 @@ fn parse_offset(offset: String) -> Result(Int, Nil) {
 
 fn generate_offset(offset: Int) -> Result(String, Nil) {
   case offset {
-    0 -> Ok("+00:00")
+    0 -> Ok("Z")
     _ ->
       case
         [#(offset, duration.MicroSecond)]
@@ -251,6 +317,44 @@ fn generate_offset(offset: Int) -> Result(String, Nil) {
         _ -> Error(Nil)
       }
   }
+}
+
+fn parse_iso_section(
+  section: String,
+  pattern_string: String,
+  default: Int,
+) -> Result(List(Int), Nil) {
+  let assert Ok(pattern) = regex.from_string(pattern_string)
+  case regex.scan(pattern, section) {
+    [regex.Match(_, [option.Some(major)])]
+    | [regex.Match(_, [option.Some(major), option.None])] -> [
+      int.parse(major),
+      Ok(default),
+      Ok(default),
+    ]
+
+    [regex.Match(_, [option.Some(major), option.Some(middle)])]
+    | [regex.Match(_, [option.Some(major), option.Some(middle), option.None])] -> [
+      int.parse(major),
+      int.parse(middle),
+      Ok(default),
+    ]
+
+    [
+      regex.Match(
+        _,
+        [option.Some(major), option.Some(middle), option.Some(minor)],
+      ),
+    ] -> [int.parse(major), int.parse(middle), int.parse(minor)]
+
+    _ -> [Error(Nil)]
+  }
+  |> list.try_map(fn(part) {
+    case part {
+      Ok(inner) -> Ok(inner)
+      Error(Nil) -> Error(Nil)
+    }
+  })
 }
 
 if erlang {
@@ -293,12 +397,6 @@ if erlang {
   external fn ffi_from_parts(#(#(Int, Int, Int), #(Int, Int, Int)), Int) -> Int =
     "birl_ffi" "from_parts"
 
-  external fn ffi_to_iso(Int) -> String =
-    "birl_ffi" "to_iso"
-
-  external fn ffi_from_iso(String) -> Int =
-    "birl_ffi" "from_iso"
-
   external fn ffi_weekday(Int) -> Int =
     "birl_ffi" "weekday"
 }
@@ -318,12 +416,6 @@ if javascript {
 
   external fn ffi_from_parts(#(#(Int, Int, Int), #(Int, Int, Int)), Int) -> Int =
     "../birl_ffi.mjs" "from_parts"
-
-  external fn ffi_to_iso(Int) -> String =
-    "../birl_ffi.mjs" "to_iso"
-
-  external fn ffi_from_iso(String) -> Int =
-    "../birl_ffi.mjs" "from_iso"
 
   external fn ffi_weekday(Int) -> Int =
     "../birl_ffi.mjs" "weekday"

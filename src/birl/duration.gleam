@@ -3,6 +3,7 @@ import gleam/list
 import gleam/regex
 import gleam/string
 import gleam/option
+import gleam/result
 
 pub type Duration {
   Duration(Int)
@@ -20,7 +21,7 @@ pub type Unit {
   Year
 }
 
-const milli_second = 1_000
+const milli_second = 1000
 
 const second = 1_000_000
 
@@ -46,17 +47,16 @@ pub fn new(values: List(#(Int, Unit))) -> Duration {
   |> list.fold(
     0,
     fn(total, current) {
-      let #(amount, unit) = current
-      case unit {
-        MicroSecond -> total + amount
-        MilliSecond -> total + amount * milli_second
-        Second -> total + amount * second
-        Minute -> total + amount * minute
-        Hour -> total + amount * hour
-        Day -> total + amount * day
-        Week -> total + amount * week
-        Month -> total + amount * month
-        Year -> total + amount * year
+      case current {
+        #(amount, MicroSecond) -> total + amount
+        #(amount, MilliSecond) -> total + amount * milli_second
+        #(amount, Second) -> total + amount * second
+        #(amount, Minute) -> total + amount * minute
+        #(amount, Hour) -> total + amount * hour
+        #(amount, Day) -> total + amount * day
+        #(amount, Week) -> total + amount * week
+        #(amount, Month) -> total + amount * month
+        #(amount, Year) -> total + amount * year
       }
     },
   )
@@ -69,17 +69,16 @@ pub fn accurate_new(values: List(#(Int, Unit))) -> Duration {
   |> list.fold(
     0,
     fn(total, current) {
-      let #(amount, unit) = current
-      case unit {
-        MicroSecond -> total + amount
-        MilliSecond -> total + amount * milli_second
-        Second -> total + amount * second
-        Minute -> total + amount * minute
-        Hour -> total + amount * hour
-        Day -> total + amount * day
-        Week -> total + amount * week
-        Month -> total + amount * accurate_month
-        Year -> total + amount * accurate_year
+      case current {
+        #(amount, MicroSecond) -> total + amount
+        #(amount, MilliSecond) -> total + amount * milli_second
+        #(amount, Second) -> total + amount * second
+        #(amount, Minute) -> total + amount * minute
+        #(amount, Hour) -> total + amount * hour
+        #(amount, Day) -> total + amount * day
+        #(amount, Week) -> total + amount * week
+        #(amount, Month) -> total + amount * accurate_month
+        #(amount, Year) -> total + amount * accurate_year
       }
     },
   )
@@ -202,7 +201,7 @@ const units = [
 /// Numbers with no unit are considered as microseconds.
 /// Specifying `accurate:` is equivalent to using `accurate_new`.
 pub fn parse(expression: String) -> Result(Duration, Nil) {
-  assert Ok(re) = regex.from_string("(\\d+)\\s*(\\w+)")
+  let assert Ok(re) = regex.from_string("(\\d+)\\s*(\\w+)")
 
   let #(accurate, expression) = case
     string.starts_with(expression, "accurate:")
@@ -223,9 +222,11 @@ pub fn parse(expression: String) -> Result(Duration, Nil) {
     |> list.try_map(fn(item) {
       case item {
         [regex.Match(_, [option.Some(amount_string), option.Some(unit)])] -> {
-          try amount = int.parse(amount_string)
-          try #(unit, _) =
-            list.find(units, fn(item) { list.contains(item.1, unit) })
+          use amount <- result.then(int.parse(amount_string))
+          use #(unit, _) <- result.then(list.find(
+            units,
+            fn(item) { list.contains(item.1, unit) },
+          ))
           #(amount, unit)
           |> Ok
         }
@@ -245,7 +246,5 @@ pub fn parse(expression: String) -> Result(Duration, Nil) {
 }
 
 fn extract(duration: Int, unit: Int) -> #(Int, Int) {
-  assert Ok(amount) = int.divide(duration, unit)
-  assert Ok(remaining) = int.modulo(duration, unit)
-  #(amount, remaining)
+  #(duration / unit, duration % unit)
 }

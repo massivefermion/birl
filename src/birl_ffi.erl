@@ -6,8 +6,6 @@
     monotonic_now/0,
     to_parts/1,
     from_parts/2,
-    to_iso/1,
-    from_iso/1,
     weekday/1
 ]).
 
@@ -29,44 +27,15 @@ monotonic_now() ->
     CurrentTime = erlang:monotonic_time(),
     (CurrentTime - StartTime) div 1_000.
 
-to_parts(Timestmap) ->
-    calendar:system_time_to_universal_time(Timestmap, microsecond).
+to_parts(Timestamp) ->
+    calendar:system_time_to_universal_time(Timestamp, microsecond).
 
-from_parts(Parts, _) ->
+from_parts(Parts, Offset) ->
     {{Year, Month, Day}, {Hour, Minute, Second}} = Parts,
     DaysInYears = calculate_days_from_year(Year - 1, 0),
     DaysInMonths = calculate_days_from_month(Year, Month - 1, 0),
     Days = DaysInYears + DaysInMonths + Day - 1,
-    ((Days * 3600 * 24) + (Hour * 3600) + (Minute * 60) + Second) * 1_000_000.
-
-to_iso(Timestmap) ->
-    {{Year, Month, Day}, {Hour, Minute, Second}} = to_parts(Timestmap),
-    MilliSecond = (Timestmap rem 1_000_000) div 1_000,
-    iolist_to_binary(
-        io_lib:format(
-            "~4.10.0B-~2.10.0B-~2.10.0BT~2.10.0B:~2.10.0B:~2.10.0B.~3.10.0BZ",
-            [Year, Month, Day, Hour, Minute, Second, MilliSecond]
-        )
-    ).
-
-from_iso(ISODate) ->
-    [Date, Time] = string:split(ISODate, "T"),
-    [YearStr, MonthStr, DayStr] = string:split(Date, "-", all),
-    [HoursStr, MinutesStr, Rest] = string:split(Time, ":", all),
-    [SecondsStr, MilliSecondsStr] = string:split(Rest, "."),
-    Year = binary_to_integer(YearStr),
-    Month = binary_to_integer(MonthStr),
-    Day = binary_to_integer(DayStr),
-    Hours = binary_to_integer(HoursStr),
-    Minutes = binary_to_integer(MinutesStr),
-    Seconds = binary_to_integer(SecondsStr),
-    MilliSeconds = binary_to_integer(string:slice(MilliSecondsStr, 0, 3)),
-    DaysInYears = calculate_days_from_year(Year - 1, 0),
-    DaysInMonths = calculate_days_from_month(Year, Month - 1, 0),
-    Days = DaysInYears + DaysInMonths + Day - 1,
-    TotalMilliSeconds =
-        ((((Days * 3600 * 24) + (Hours * 3600) + (Minutes * 60) + Seconds) * 1000) + MilliSeconds),
-    TotalMilliSeconds * 1000.
+    ((Days * 3600 * 24) + (Hour * 3600) + (Minute * 60) + Second) * 1_000_000 - Offset.
 
 weekday(Timestamp) ->
     {Date, _} = to_parts(Timestamp),
@@ -91,3 +60,32 @@ calculate_days_from_month(Year, Month, Days) ->
         false ->
             calculate_days_from_month(Year, Month - 1, Days + lists:nth(Month, ?DaysInMonths))
     end.
+
+% to_iso(Timestamp) ->
+%     {{Year, Month, Day}, {Hour, Minute, Second}} = to_parts(Timestamp),
+%     MilliSecond = (Timestamp rem 1_000_000) div 1_000,
+%     iolist_to_binary(
+%         io_lib:format(
+%             "~4.10.0B-~2.10.0B-~2.10.0BT~2.10.0B:~2.10.0B:~2.10.0B.~3.10.0BZ",
+%             [Year, Month, Day, Hour, Minute, Second, MilliSecond]
+%         )
+%     ).
+
+% from_iso(ISODate) ->
+%     [Date, Time] = string:split(ISODate, "T"),
+%     [YearStr, MonthStr, DayStr] = string:split(Date, "-", all),
+%     [HoursStr, MinutesStr, Rest] = string:split(Time, ":", all),
+%     [SecondsStr, MilliSecondsStr] = string:split(Rest, "."),
+%     Year = binary_to_integer(YearStr),
+%     Month = binary_to_integer(MonthStr),
+%     Day = binary_to_integer(DayStr),
+%     Hours = binary_to_integer(HoursStr),
+%     Minutes = binary_to_integer(MinutesStr),
+%     Seconds = binary_to_integer(SecondsStr),
+%     MilliSeconds = binary_to_integer(string:slice(MilliSecondsStr, 0, 3)),
+%     DaysInYears = calculate_days_from_year(Year - 1, 0),
+%     DaysInMonths = calculate_days_from_month(Year, Month - 1, 0),
+%     Days = DaysInYears + DaysInMonths + Day - 1,
+%     TotalMilliSeconds =
+%         ((((Days * 3600 * 24) + (Hours * 3600) + (Minutes * 60) + Seconds) * 1000) + MilliSeconds),
+%     TotalMilliSeconds * 1000.
