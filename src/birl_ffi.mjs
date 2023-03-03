@@ -15,7 +15,12 @@ export function to_parts(timestamp) {
   const date = new Date(timestamp / 1000)
   return [
     [date.getFullYear(), date.getUTCMonth() + 1, date.getUTCDate()],
-    [date.getUTCHours(), date.getUTCMinutes(), date.getUTCSeconds()],
+    [
+      date.getUTCHours(),
+      date.getUTCMinutes(),
+      date.getUTCSeconds(),
+      date.getUTCMilliseconds(),
+    ],
   ]
 }
 
@@ -27,6 +32,7 @@ export function from_parts(parts, offset) {
   date.setUTCHours(parts[1][0])
   date.setUTCMinutes(parts[1][1])
   date.setUTCSeconds(parts[1][2])
+  date.setUTCMilliseconds(parts[1][3])
   return date.getTime() * 1000 - offset
 }
 

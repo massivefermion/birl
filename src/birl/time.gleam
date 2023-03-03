@@ -49,7 +49,9 @@ pub fn now_with_offset(offset: String) -> Result(Time, Nil) {
   |> Ok
 }
 
-pub fn to_parts(value: Time) -> #(#(Int, Int, Int), #(Int, Int, Int), String) {
+pub fn to_parts(
+  value: Time,
+) -> #(#(Int, Int, Int), #(Int, Int, Int, Int), String) {
   case value {
     Time(wall_time: t, offset: o, monotonic_time: _) -> {
       let #(date, time) = ffi_to_parts(t + o)
@@ -61,7 +63,7 @@ pub fn to_parts(value: Time) -> #(#(Int, Int, Int), #(Int, Int, Int), String) {
 
 pub fn from_parts(
   date: #(Int, Int, Int),
-  time: #(Int, Int, Int),
+  time: #(Int, Int, Int, Int),
   offset offset: String,
 ) -> Result(Time, Nil) {
   use offset_number <- result.then(parse_offset(offset))
@@ -71,7 +73,8 @@ pub fn from_parts(
 }
 
 pub fn to_iso8601(value: Time) -> String {
-  let #(#(year, month, day), #(hour, minute, second), offset) = to_parts(value)
+  let #(#(year, month, day), #(hour, minute, second, milli_second), offset) =
+    to_parts(value)
   int.to_string(year) <> "-" <> {
     month
     |> int.to_string
@@ -92,7 +95,11 @@ pub fn to_iso8601(value: Time) -> String {
     second
     |> int.to_string
     |> string.pad_left(2, "0")
-  } <> ".000" <> offset
+  } <> "." <> {
+    milli_second
+    |> int.to_string
+    |> string.pad_left(3, "0")
+  } <> offset
 }
 
 pub fn from_iso8601(value: String) -> Result(Time, Nil) {
@@ -155,10 +162,14 @@ pub fn from_iso8601(value: String) -> Result(Time, Nil) {
       ))
 
       case
-        from_parts(#(year, month, day), #(hour, minute, second), offset_string)
+        from_parts(
+          #(year, month, day),
+          #(hour, minute, second, milli_seconds),
+          offset_string,
+        )
       {
         Ok(Time(timestamp, offset, option.None)) ->
-          Ok(Time(timestamp + milli_seconds * 1000, offset, option.None))
+          Ok(Time(timestamp, offset, option.None))
 
         Error(Nil) -> Error(Nil)
       }
@@ -391,10 +402,13 @@ if erlang {
   external fn ffi_monotonic_now() -> Int =
     "birl_ffi" "monotonic_now"
 
-  external fn ffi_to_parts(Int) -> #(#(Int, Int, Int), #(Int, Int, Int)) =
+  external fn ffi_to_parts(Int) -> #(#(Int, Int, Int), #(Int, Int, Int, Int)) =
     "birl_ffi" "to_parts"
 
-  external fn ffi_from_parts(#(#(Int, Int, Int), #(Int, Int, Int)), Int) -> Int =
+  external fn ffi_from_parts(
+    #(#(Int, Int, Int), #(Int, Int, Int, Int)),
+    Int,
+  ) -> Int =
     "birl_ffi" "from_parts"
 
   external fn ffi_weekday(Int) -> Int =
@@ -411,10 +425,13 @@ if javascript {
   external fn ffi_monotonic_now() -> Int =
     "../birl_ffi.mjs" "monotonic_now"
 
-  external fn ffi_to_parts(Int) -> #(#(Int, Int, Int), #(Int, Int, Int)) =
+  external fn ffi_to_parts(Int) -> #(#(Int, Int, Int), #(Int, Int, Int, Int)) =
     "../birl_ffi.mjs" "to_parts"
 
-  external fn ffi_from_parts(#(#(Int, Int, Int), #(Int, Int, Int)), Int) -> Int =
+  external fn ffi_from_parts(
+    #(#(Int, Int, Int), #(Int, Int, Int, Int)),
+    Int,
+  ) -> Int =
     "../birl_ffi.mjs" "from_parts"
 
   external fn ffi_weekday(Int) -> Int =

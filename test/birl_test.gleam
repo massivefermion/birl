@@ -6,7 +6,7 @@ import birl/duration
 
 const iso_datetime = "2022-12-22T16:38:23.000+03:30"
 
-const datetime_in_parts = #(#(2022, 12, 22), #(16, 38, 23))
+const datetime_in_parts = #(#(2022, 12, 22), #(16, 38, 23, 0))
 
 pub fn main() {
   gleeunit.main()
@@ -50,7 +50,7 @@ pub fn to_parts_test() {
   time.from_iso8601(iso_datetime)
   |> should.be_ok
   |> time.to_parts
-  |> should.equal(#(#(2022, 12, 22), #(16, 38, 23), "+03:30"))
+  |> should.equal(#(#(2022, 12, 22), #(16, 38, 23, 0), "+03:30"))
 }
 
 pub fn from_parts_test() {

@@ -28,14 +28,19 @@ monotonic_now() ->
     (CurrentTime - StartTime) div 1_000.
 
 to_parts(Timestamp) ->
-    calendar:system_time_to_universal_time(Timestamp, microsecond).
+    {Date, {Hour, Minute, Second}} = calendar:system_time_to_universal_time(
+        Timestamp, microsecond
+    ),
+    MilliSecond = (Timestamp rem 1_000_000) div 1_000,
+    {Date, {Hour, Minute, Second, MilliSecond}}.
 
 from_parts(Parts, Offset) ->
-    {{Year, Month, Day}, {Hour, Minute, Second}} = Parts,
+    {{Year, Month, Day}, {Hour, Minute, Second, MilliSecond}} = Parts,
     DaysInYears = calculate_days_from_year(Year - 1, 0),
     DaysInMonths = calculate_days_from_month(Year, Month - 1, 0),
     Days = DaysInYears + DaysInMonths + Day - 1,
-    ((Days * 3600 * 24) + (Hour * 3600) + (Minute * 60) + Second) * 1_000_000 - Offset.
+    Seconds = (Days * 3600 * 24) + (Hour * 3600) + (Minute * 60) + Second,
+    Seconds * 1_000_000 + MilliSecond * 1_000 - Offset.
 
 weekday(Timestamp) ->
     {Date, _} = to_parts(Timestamp),
