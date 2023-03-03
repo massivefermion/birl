@@ -36,9 +36,9 @@ export function from_parts(parts, offset) {
   return date.getTime() * 1000 - offset
 }
 
-export function weekday(timestamp, offset) {
-  const date = new Date((timestamp - offset) / 1000)
-  return date.getDay()
+export function weekday(timestamp) {
+  const date = new Date(timestamp / 1000)
+  return date.getUTCDay()
 }
 
 // export function to_iso(timestamp) {
