@@ -49,6 +49,15 @@ pub fn now_with_offset(offset: String) -> Result(Time, Nil) {
   |> Ok
 }
 
+pub fn change_offset(value: Time, new_offset: String) -> Result(Time, Nil) {
+  use new_offset_number <- result.then(parse_offset(new_offset))
+  case value {
+    Time(wall_time: t, offset: _, monotonic_time: mt) ->
+      Time(t, new_offset_number, mt)
+      |> Ok
+  }
+}
+
 pub fn to_parts(
   value: Time,
 ) -> #(#(Int, Int, Int), #(Int, Int, Int, Int), String) {
@@ -75,6 +84,7 @@ pub fn from_parts(
 pub fn to_iso8601(value: Time) -> String {
   let #(#(year, month, day), #(hour, minute, second, milli_second), offset) =
     to_parts(value)
+
   int.to_string(year) <> "-" <> {
     month
     |> int.to_string
@@ -322,6 +332,30 @@ fn generate_offset(offset: Int) -> Result(String, Nil) {
             |> int.absolute_value
             |> int.to_string
             |> string.pad_left(2, "0"),
+          ]
+          |> string.join(":")
+          |> Ok
+
+        [#(hour, duration.Hour)] ->
+          [
+            case hour > 0 {
+              True ->
+                string.concat([
+                  "+",
+                  hour
+                  |> int.to_string
+                  |> string.pad_left(2, "0"),
+                ])
+              False ->
+                string.concat([
+                  "-",
+                  hour
+                  |> int.absolute_value
+                  |> int.to_string
+                  |> string.pad_left(2, "0"),
+                ])
+            },
+            "00",
           ]
           |> string.join(":")
           |> Ok
