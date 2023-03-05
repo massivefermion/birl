@@ -11,6 +11,9 @@ pub opaque type Time {
   Time(wall_time: Int, offset: Int, monotonic_time: option.Option(Int))
 }
 
+/// you can use the add function and this constant to create a time value given a unix timestamp
+pub const unix_time_origin = Time(0, 0, option.None)
+
 pub type WeekDay {
   Monday
   Tuesday
@@ -49,6 +52,9 @@ pub fn now_with_offset(offset: String) -> Result(Time, Nil) {
   |> Ok
 }
 
+/// Some examples of acceptable offsets:
+///
+/// `"+330", "03:30", "-8:00","-7", "-0400", "03"`
 pub fn change_offset(value: Time, new_offset: String) -> Result(Time, Nil) {
   use new_offset_number <- result.then(parse_offset(new_offset))
   case value {
