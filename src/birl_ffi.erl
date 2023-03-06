@@ -48,12 +48,19 @@ weekday(Timestamp) ->
 
 calculate_days_from_year(1969, Days) ->
     Days;
-calculate_days_from_year(Year, Days) ->
+calculate_days_from_year(Year, Days) when Year > 1969 ->
     case calendar:is_leap_year(Year) of
         true ->
             calculate_days_from_year(Year - 1, Days + 366);
         false ->
             calculate_days_from_year(Year - 1, Days + 365)
+    end;
+calculate_days_from_year(Year, Days) when Year < 1969 ->
+    case calendar:is_leap_year(Year) of
+        true ->
+            calculate_days_from_year(Year + 1, Days - 366);
+        false ->
+            calculate_days_from_year(Year + 1, Days - 365)
     end.
 
 calculate_days_from_month(_, 0, Days) ->

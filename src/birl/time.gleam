@@ -79,7 +79,7 @@ pub fn to_parts(
 pub fn from_parts(
   date: #(Int, Int, Int),
   time: #(Int, Int, Int, Int),
-  offset offset: String,
+  offset: String,
 ) -> Result(Time, Nil) {
   use offset_number <- result.then(parse_offset(offset))
   ffi_from_parts(#(date, time), offset_number)
