@@ -150,9 +150,7 @@ pub fn from_iso8601(value: String) -> Result(Time, Nil) {
       }
   }
 
-  let date_string = string.replace(date_string, "-", "")
   let time_string = string.replace(time_string, ":", "")
-
   let #(time_string, milli_seconds_result) = case
     string.split(time_string, ".")
   {
@@ -165,17 +163,8 @@ pub fn from_iso8601(value: String) -> Result(Time, Nil) {
 
   case milli_seconds_result {
     Ok(milli_seconds) -> {
-      use [year, month, day] <- result.then(parse_iso_section(
-        date_string,
-        "(\\d{4})(\\d{2})?(\\d{2})?",
-        1,
-      ))
-
-      use [hour, minute, second] <- result.then(parse_iso_section(
-        time_string,
-        "(\\d{2})(\\d{2})?(\\d{2})?",
-        0,
-      ))
+      use [year, month, day] <- result.then(parse_date(date_string))
+      use [hour, minute, second] <- result.then(parse_time(time_string))
 
       case
         from_parts(
@@ -370,11 +359,64 @@ fn generate_offset(offset: Int) -> Result(String, Nil) {
   }
 }
 
-fn parse_iso_section(
-  section: String,
-  pattern_string: String,
-  default: Int,
-) -> Result(List(Int), Nil) {
+fn parse_date(date: String) {
+  let assert Ok(dash_pattern) =
+    regex.from_string(
+      "(\\d{4})(?:-(1[0-2]|0?[0-9]))?(?:-(3[0-1]|[1-2][0-9]|0?[0-9]))?",
+    )
+
+  case regex.scan(dash_pattern, date) {
+    [regex.Match(_, [option.Some(major)])]
+    | [regex.Match(_, [option.Some(major), option.None])] -> [
+      int.parse(major),
+      Ok(1),
+      Ok(1),
+    ]
+
+    [regex.Match(_, [option.Some(major), option.Some(middle)])]
+    | [regex.Match(_, [option.Some(major), option.Some(middle), option.None])] -> [
+      int.parse(major),
+      int.parse(middle),
+      Ok(1),
+    ]
+
+    [
+      regex.Match(
+        _,
+        [option.Some(major), option.Some(middle), option.Some(minor)],
+      ),
+    ] -> [int.parse(major), int.parse(middle), int.parse(minor)]
+
+    _ ->
+      parse_iso_section(
+        date,
+        "(\\d{4})(1[0-2]|0?[0-9])?(3[0-1]|[1-2][0-9]|0?[0-9])?",
+        1,
+      )
+  }
+  |> list.try_map(fn(part) {
+    case part {
+      Ok(inner) -> Ok(inner)
+      Error(Nil) -> Error(Nil)
+    }
+  })
+}
+
+fn parse_time(time: String) {
+  parse_iso_section(
+    time,
+    "(2[0-3]|1[0-9]|0?[0-9])([1-5][0-9]|0?[0-9])?([1-5][0-9]|0?[0-9])?",
+    0,
+  )
+  |> list.try_map(fn(part) {
+    case part {
+      Ok(inner) -> Ok(inner)
+      Error(Nil) -> Error(Nil)
+    }
+  })
+}
+
+fn parse_iso_section(section: String, pattern_string: String, default: Int) {
   let assert Ok(pattern) = regex.from_string(pattern_string)
   case regex.scan(pattern, section) {
     [regex.Match(_, [option.Some(major)])]
@@ -400,12 +442,6 @@ fn parse_iso_section(
 
     _ -> [Error(Nil)]
   }
-  |> list.try_map(fn(part) {
-    case part {
-      Ok(inner) -> Ok(inner)
-      Error(Nil) -> Error(Nil)
-    }
-  })
 }
 
 if erlang {
