@@ -420,7 +420,7 @@ fn parse_iso_section(section: String, pattern_string: String, default: Int) {
   let assert Ok(pattern) = regex.from_string(pattern_string)
   case regex.scan(pattern, section) {
     [regex.Match(_, [option.Some(major)])]
-    | [regex.Match(_, [option.Some(major), option.None])] -> [
+    | [regex.Match(_, [option.Some(major), option.None, option.None])] -> [
       int.parse(major),
       Ok(default),
       Ok(default),
