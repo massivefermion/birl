@@ -1,10 +1,12 @@
 import gleam/int
+import gleam/bool
 import gleam/list
 import gleam/order
 import gleam/regex
 import gleam/result
 import gleam/string
 import gleam/option
+import gleam/function
 import birl/duration
 
 pub opaque type Time {
@@ -69,7 +71,7 @@ pub fn to_parts(
 ) -> #(#(Int, Int, Int), #(Int, Int, Int, Int), String) {
   case value {
     Time(wall_time: t, offset: o, monotonic_time: _) -> {
-      let #(date, time) = ffi_to_parts(t + o)
+      let #(date, time) = ffi_to_parts(t, o)
       let assert Ok(offset) = generate_offset(o)
       #(date, time, offset)
     }
@@ -185,12 +187,12 @@ pub fn from_iso8601(value: String) -> Result(Time, Nil) {
 }
 
 pub fn compare(a: Time, b: Time) -> order.Order {
-  let Time(wall_time: wta, offset: oa, monotonic_time: mta) = a
-  let Time(wall_time: wtb, offset: ob, monotonic_time: mtb) = b
+  let Time(wall_time: wta, offset: _, monotonic_time: mta) = a
+  let Time(wall_time: wtb, offset: _, monotonic_time: mtb) = b
 
   let #(ta, tb) = case #(mta, mtb) {
     #(option.Some(ta), option.Some(tb)) -> #(ta, tb)
-    _ -> #(wta + oa, wtb + ob)
+    _ -> #(wta, wtb)
   }
 
   case ta == tb {
@@ -204,12 +206,12 @@ pub fn compare(a: Time, b: Time) -> order.Order {
 }
 
 pub fn difference(a: Time, b: Time) -> duration.Duration {
-  let Time(wall_time: wta, offset: oa, monotonic_time: mta) = a
-  let Time(wall_time: wtb, offset: ob, monotonic_time: mtb) = b
+  let Time(wall_time: wta, offset: _, monotonic_time: mta) = a
+  let Time(wall_time: wtb, offset: _, monotonic_time: mtb) = b
 
   let #(ta, tb) = case #(mta, mtb) {
     #(option.Some(ta), option.Some(tb)) -> #(ta, tb)
-    _ -> #(wta + oa, wtb + ob)
+    _ -> #(wta, wtb)
   }
 
   duration.Duration(ta - tb)
@@ -248,13 +250,14 @@ pub fn subtract(value: Time, duration: duration.Duration) -> Time {
 pub fn weekday(value: Time) -> WeekDay {
   case value {
     Time(wall_time: t, offset: o, monotonic_time: _) -> {
-      let assert Ok(weekday) = list.at(weekdays, ffi_weekday(t + o))
+      let assert Ok(weekday) = list.at(weekdays, ffi_weekday(t, o))
       weekday
     }
   }
 }
 
 fn parse_offset(offset: String) -> Result(Int, Nil) {
+  use <- bool.guard(list.contains(["Z", "z"], offset), Ok(0))
   let assert Ok(re) = regex.from_string("([+-])")
 
   use #(sign, offset) <- result.then(case regex.split(re, offset) {
@@ -263,6 +266,7 @@ fn parse_offset(offset: String) -> Result(Int, Nil) {
     [_] -> Ok(#(1, offset))
     _ -> Error(Nil)
   })
+
   case string.split(offset, ":") {
     [hour_str, minute_str] -> {
       use hour <- result.then(int.parse(hour_str))
@@ -296,66 +300,63 @@ fn parse_offset(offset: String) -> Result(Int, Nil) {
 }
 
 fn generate_offset(offset: Int) -> Result(String, Nil) {
-  case offset {
-    0 -> Ok("Z")
-    _ ->
-      case
-        [#(offset, duration.MicroSecond)]
-        |> duration.new
-        |> duration.decompose
-      {
-        [#(hour, duration.Hour), #(minute, duration.Minute)] ->
-          [
-            case hour > 0 {
-              True ->
-                string.concat([
-                  "+",
-                  hour
-                  |> int.to_string
-                  |> string.pad_left(2, "0"),
-                ])
-              False ->
-                string.concat([
-                  "-",
-                  hour
-                  |> int.absolute_value
-                  |> int.to_string
-                  |> string.pad_left(2, "0"),
-                ])
-            },
-            minute
-            |> int.absolute_value
-            |> int.to_string
-            |> string.pad_left(2, "0"),
-          ]
-          |> string.join(":")
-          |> Ok
+  use <- bool.guard(offset == 0, Ok("Z"))
+  case
+    [#(offset, duration.MicroSecond)]
+    |> duration.new
+    |> duration.decompose
+  {
+    [#(hour, duration.Hour), #(minute, duration.Minute)] ->
+      [
+        case hour > 0 {
+          True ->
+            string.concat([
+              "+",
+              hour
+              |> int.to_string
+              |> string.pad_left(2, "0"),
+            ])
+          False ->
+            string.concat([
+              "-",
+              hour
+              |> int.absolute_value
+              |> int.to_string
+              |> string.pad_left(2, "0"),
+            ])
+        },
+        minute
+        |> int.absolute_value
+        |> int.to_string
+        |> string.pad_left(2, "0"),
+      ]
+      |> string.join(":")
+      |> Ok
 
-        [#(hour, duration.Hour)] ->
-          [
-            case hour > 0 {
-              True ->
-                string.concat([
-                  "+",
-                  hour
-                  |> int.to_string
-                  |> string.pad_left(2, "0"),
-                ])
-              False ->
-                string.concat([
-                  "-",
-                  hour
-                  |> int.absolute_value
-                  |> int.to_string
-                  |> string.pad_left(2, "0"),
-                ])
-            },
-            "00",
-          ]
-          |> string.join(":")
-          |> Ok
-        _ -> Error(Nil)
-      }
+    [#(hour, duration.Hour)] ->
+      [
+        case hour > 0 {
+          True ->
+            string.concat([
+              "+",
+              hour
+              |> int.to_string
+              |> string.pad_left(2, "0"),
+            ])
+          False ->
+            string.concat([
+              "-",
+              hour
+              |> int.absolute_value
+              |> int.to_string
+              |> string.pad_left(2, "0"),
+            ])
+        },
+        "00",
+      ]
+      |> string.join(":")
+      |> Ok
+    _ -> Error(Nil)
   }
 }
 
@@ -394,12 +395,7 @@ fn parse_date(date: String) {
         1,
       )
   }
-  |> list.try_map(fn(part) {
-    case part {
-      Ok(inner) -> Ok(inner)
-      Error(Nil) -> Error(Nil)
-    }
-  })
+  |> list.try_map(function.identity)
 }
 
 fn parse_time(time: String) {
@@ -408,12 +404,7 @@ fn parse_time(time: String) {
     "(2[0-3]|1[0-9]|0?[0-9])([1-5][0-9]|0?[0-9])?([1-5][0-9]|0?[0-9])?",
     0,
   )
-  |> list.try_map(fn(part) {
-    case part {
-      Ok(inner) -> Ok(inner)
-      Error(Nil) -> Error(Nil)
-    }
-  })
+  |> list.try_map(function.identity)
 }
 
 fn parse_iso_section(section: String, pattern_string: String, default: Int) {
@@ -478,7 +469,10 @@ if erlang {
   external fn ffi_monotonic_now() -> Int =
     "birl_ffi" "monotonic_now"
 
-  external fn ffi_to_parts(Int) -> #(#(Int, Int, Int), #(Int, Int, Int, Int)) =
+  external fn ffi_to_parts(
+    Int,
+    Int,
+  ) -> #(#(Int, Int, Int), #(Int, Int, Int, Int)) =
     "birl_ffi" "to_parts"
 
   external fn ffi_from_parts(
@@ -487,7 +481,7 @@ if erlang {
   ) -> Int =
     "birl_ffi" "from_parts"
 
-  external fn ffi_weekday(Int) -> Int =
+  external fn ffi_weekday(Int, Int) -> Int =
     "birl_ffi" "weekday"
 }
 
@@ -501,7 +495,10 @@ if javascript {
   external fn ffi_monotonic_now() -> Int =
     "../birl_ffi.mjs" "monotonic_now"
 
-  external fn ffi_to_parts(Int) -> #(#(Int, Int, Int), #(Int, Int, Int, Int)) =
+  external fn ffi_to_parts(
+    Int,
+    Int,
+  ) -> #(#(Int, Int, Int), #(Int, Int, Int, Int)) =
     "../birl_ffi.mjs" "to_parts"
 
   external fn ffi_from_parts(
@@ -510,6 +507,6 @@ if javascript {
   ) -> Int =
     "../birl_ffi.mjs" "from_parts"
 
-  external fn ffi_weekday(Int) -> Int =
+  external fn ffi_weekday(Int, Int) -> Int =
     "../birl_ffi.mjs" "weekday"
 }

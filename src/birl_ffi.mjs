@@ -11,8 +11,8 @@ export function monotonic_now() {
   return Math.floor(globalThis.performance.now() * 1000)
 }
 
-export function to_parts(timestamp) {
-  const date = new Date(timestamp / 1000)
+export function to_parts(timestamp, offset) {
+  const date = new Date((timestamp + offset) / 1000)
   return [
     [date.getFullYear(), date.getUTCMonth() + 1, date.getUTCDate()],
     [
@@ -36,18 +36,7 @@ export function from_parts(parts, offset) {
   return date.getTime() * 1000 - offset
 }
 
-export function weekday(timestamp) {
-  const date = new Date(timestamp / 1000)
+export function weekday(timestamp, offset) {
+  const date = new Date((timestamp + offset) / 1000)
   return date.getUTCDay()
 }
-
-// export function to_iso(timestamp) {
-//   const date = new Date(timestamp / 1000)
-//   return date.toISOString()
-// }
-
-// export function from_iso(iso_date) {
-//   const date = new Date(iso_date)
-//   if (isNaN(date)) return new Error(Nil)
-//   return date.getTime() * 1000
-// }
