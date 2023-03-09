@@ -367,7 +367,7 @@ fn parse_date(date: String) {
 
   case regex.scan(dash_pattern, date) {
     [regex.Match(_, [option.Some(major)])]
-    | [regex.Match(_, [option.Some(major), option.None])] -> [
+    | [regex.Match(_, [option.Some(major), option.None, option.None])] -> [
       int.parse(major),
       Ok(1),
       Ok(1),
