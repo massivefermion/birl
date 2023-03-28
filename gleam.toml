@@ -8,7 +8,7 @@ repository = {type = "github", user = "massivefermion", repo = "birl"}
 
 [dependencies]
 gleam_stdlib = "~> 0.28"
-ranger = "~>0.1"
+ranger = "~> 0.1"
 
 [dev-dependencies]
 gleeunit = "~> 0.10"
