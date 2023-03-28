@@ -7,16 +7,15 @@ import gleam/result
 import gleam/string
 import gleam/option
 import gleam/function
+import gleam/iterator
 import birl/duration
+import ranger
 
 pub opaque type Time {
   Time(wall_time: Int, offset: Int, monotonic_time: option.Option(Int))
 }
 
-/// you can use the add function and this constant to create a time value given a unix timestamp
-pub const unix_time_origin = Time(0, 0, option.None)
-
-pub type WeekDay {
+pub type Weekday {
   Monday
   Tuesday
   Wednesday
@@ -26,8 +25,23 @@ pub type WeekDay {
   Sunday
 }
 
+pub type Month {
+  January
+  February
+  March
+  April
+  May
+  June
+  July
+  August
+  September
+  October
+  November
+  December
+}
+
 /// use this to get the current time in the local timezone offset
-pub fn now() {
+pub fn now() -> Time {
   let now = ffi_now()
   let offset_in_minutes = ffi_local_offset()
   let monotonic_now = ffi_monotonic_now()
@@ -35,13 +49,13 @@ pub fn now() {
 }
 
 /// use this to get the current time in utc
-pub fn utc_now() {
+pub fn utc_now() -> Time {
   let now = ffi_now()
   let monotonic_now = ffi_monotonic_now()
   Time(now, 0, option.Some(monotonic_now))
 }
 
-/// use this the get the current time with a given offset.
+/// use this to get the current time with a given offset.
 ///
 /// Some examples of acceptable offsets:
 ///
@@ -54,6 +68,8 @@ pub fn now_with_offset(offset: String) -> Result(Time, Nil) {
   |> Ok
 }
 
+/// use this tp change the offset of a given time value.
+///
 /// Some examples of acceptable offsets:
 ///
 /// `"+330", "03:30", "-8:00","-7", "-0400", "03"`
@@ -186,6 +202,105 @@ pub fn from_iso8601(value: String) -> Result(Time, Nil) {
   }
 }
 
+/// see [here](https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/Date)
+pub fn to_http(value: Time) -> String {
+  let assert Ok(utc_value) = change_offset(value, "Z")
+
+  let #(#(year, _, day), #(hour, minute, second, _), _) = to_parts(utc_value)
+  let short_weekday = short_string_weekday(utc_value)
+  let short_month = short_string_month(utc_value)
+
+  short_weekday <> ", " <> {
+    day
+    |> int.to_string
+    |> string.pad_left(2, "0")
+  } <> " " <> short_month <> " " <> int.to_string(year) <> " " <> {
+    hour
+    |> int.to_string
+    |> string.pad_left(2, "0")
+  } <> ":" <> {
+    minute
+    |> int.to_string
+    |> string.pad_left(2, "0")
+  } <> ":" <> {
+    second
+    |> int.to_string
+    |> string.pad_left(2, "0")
+  } <> " GMT"
+}
+
+/// see [here](https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/Date)
+pub fn from_http(value: String) -> Result(Time, Nil) {
+  let value = string.trim(value)
+  let [weekday, rest] = string.split(value, ",")
+  use <- bool.guard(
+    !list.contains(
+      list.map(
+        weekday_strings,
+        fn(weekday) {
+          let strings = weekday.1
+          strings.1
+        },
+      ),
+      weekday,
+    ),
+    Error(Nil),
+  )
+
+  let rest = string.trim(rest)
+  let assert Ok(whitespace_pattern) = regex.from_string("\\s+")
+  case regex.split(whitespace_pattern, rest) {
+    [day_string, short_month, year_string, time_string, "GMT"] -> {
+      let time_string = string.replace(time_string, ":", "")
+      case
+        #(
+          int.parse(day_string),
+          month_strings
+          |> list.index_map(fn(index, month) {
+            let strings = month.1
+            #(index, strings.1)
+          })
+          |> list.find(fn(month) { month.1 == short_month }),
+          int.parse(year_string),
+          parse_time(time_string),
+        )
+      {
+        #(Ok(day), Ok(#(month_index, _)), Ok(year), Ok([hour, minute, second])) ->
+          case
+            from_parts(
+              #(year, month_index + 1, day),
+              #(hour, minute, second, 0),
+              "Z",
+            )
+          {
+            Ok(value) -> {
+              let correct_weekday = short_string_weekday(value)
+              case correct_weekday == weekday {
+                True -> Ok(value)
+                False -> Error(Nil)
+              }
+            }
+            Error(Nil) -> Error(Nil)
+          }
+        _ -> Error(Nil)
+      }
+    }
+    _ -> Error(Nil)
+  }
+}
+
+/// unix timestamps are the number of seconds that have elapsed since 00:00:00 UTC on January 1st, 1970
+pub fn to_unix(value: Time) -> Int {
+  case value {
+    Time(t, _, _) -> t / 1_000_000
+  }
+}
+
+/// unix timestamps are the number of seconds that have elapsed since 00:00:00 UTC on January 1st, 1970
+pub fn from_unix(value: Int) -> Time {
+  Time(value * 1_000_000, 0, option.None)
+}
+
 pub fn compare(a: Time, b: Time) -> order.Order {
   let Time(wall_time: wta, offset: _, monotonic_time: mta) = a
   let Time(wall_time: wtb, offset: _, monotonic_time: mtb) = b
@@ -247,13 +362,62 @@ pub fn subtract(value: Time, duration: duration.Duration) -> Time {
   }
 }
 
-pub fn weekday(value: Time) -> WeekDay {
+pub fn weekday(value: Time) -> Weekday {
   case value {
     Time(wall_time: t, offset: o, monotonic_time: _) -> {
       let assert Ok(weekday) = list.at(weekdays, ffi_weekday(t, o))
       weekday
     }
   }
+}
+
+pub fn string_weekday(value: Time) -> String {
+  let weekday = weekday(value)
+  let assert Ok(#(weekday, _)) = list.key_find(weekday_strings, weekday)
+  weekday
+}
+
+pub fn short_string_weekday(value: Time) -> String {
+  let weekday = weekday(value)
+  let assert Ok(#(_, weekday)) = list.key_find(weekday_strings, weekday)
+  weekday
+}
+
+pub fn month(value: Time) -> Month {
+  let #(#(_, month, _), _, _) = to_parts(value)
+  let assert Ok(month) = list.at(months, month - 1)
+  month
+}
+
+pub fn string_month(value: Time) -> String {
+  let month = month(value)
+  let assert Ok(#(month, _)) = list.key_find(month_strings, month)
+  month
+}
+
+pub fn short_string_month(value: Time) -> String {
+  let month = month(value)
+  let assert Ok(#(_, month)) = list.key_find(month_strings, month)
+  month
+}
+
+pub fn range(a: Time, b: Time, s: duration.Duration) -> iterator.Iterator(Time) {
+  let assert Ok(range) =
+    ranger.create(ranger.Options(
+      validate: fn(_) { True },
+      negate_step: fn(duration) {
+        let duration.Duration(value) = duration
+        duration.Duration(-1 * value)
+      },
+      add: add,
+      compare: compare,
+    ))(
+      a,
+      b,
+      s,
+    )
+  range
+  |> ranger.unwrap
 }
 
 fn parse_offset(offset: String) -> Result(Int, Nil) {
@@ -360,22 +524,16 @@ fn generate_offset(offset: Int) -> Result(String, Nil) {
   }
 }
 
-fn parse_date(date: String) {
+fn parse_date(date: String) -> Result(List(Int), Nil) {
   let assert Ok(dash_pattern) =
     regex.from_string(
       "(\\d{4})(?:-(1[0-2]|0?[0-9]))?(?:-(3[0-1]|[1-2][0-9]|0?[0-9]))?",
     )
 
   case regex.scan(dash_pattern, date) {
-    [regex.Match(_, [option.Some(major)])]
-    | [regex.Match(_, [option.Some(major), option.None, option.None])] -> [
-      int.parse(major),
-      Ok(1),
-      Ok(1),
-    ]
+    [regex.Match(_, [option.Some(major)])] -> [int.parse(major), Ok(1), Ok(1)]
 
-    [regex.Match(_, [option.Some(major), option.Some(middle)])]
-    | [regex.Match(_, [option.Some(major), option.Some(middle), option.None])] -> [
+    [regex.Match(_, [option.Some(major), option.Some(middle)])] -> [
       int.parse(major),
       int.parse(middle),
       Ok(1),
@@ -398,7 +556,7 @@ fn parse_date(date: String) {
   |> list.try_map(function.identity)
 }
 
-fn parse_time(time: String) {
+fn parse_time(time: String) -> Result(List(Int), Nil) {
   parse_iso_section(
     time,
     "(2[0-3]|1[0-9]|0?[0-9])([1-5][0-9]|0?[0-9])?([1-5][0-9]|0?[0-9])?",
@@ -407,18 +565,20 @@ fn parse_time(time: String) {
   |> list.try_map(function.identity)
 }
 
-fn parse_iso_section(section: String, pattern_string: String, default: Int) {
+fn parse_iso_section(
+  section: String,
+  pattern_string: String,
+  default: Int,
+) -> List(Result(Int, Nil)) {
   let assert Ok(pattern) = regex.from_string(pattern_string)
   case regex.scan(pattern, section) {
-    [regex.Match(_, [option.Some(major)])]
-    | [regex.Match(_, [option.Some(major), option.None, option.None])] -> [
+    [regex.Match(_, [option.Some(major)])] -> [
       int.parse(major),
       Ok(default),
       Ok(default),
     ]
 
-    [regex.Match(_, [option.Some(major), option.Some(middle)])]
-    | [regex.Match(_, [option.Some(major), option.Some(middle), option.None])] -> [
+    [regex.Match(_, [option.Some(major), option.Some(middle)])] -> [
       int.parse(major),
       int.parse(middle),
       Ok(default),
@@ -458,6 +618,46 @@ if javascript {
     Saturday,
   ]
 }
+
+const months = [
+  January,
+  February,
+  March,
+  April,
+  May,
+  June,
+  July,
+  August,
+  September,
+  October,
+  November,
+  December,
+]
+
+const weekday_strings = [
+  #(Monday, #("Monday", "Mon")),
+  #(Tuesday, #("Tuesday", "Tue")),
+  #(Wednesday, #("Wednesday", "Wed")),
+  #(Thursday, #("Thursday", "Thu")),
+  #(Friday, #("Friday", "Fri")),
+  #(Saturday, #("Saturday", "Sat")),
+  #(Sunday, #("Sunday", "Sun")),
+]
+
+const month_strings = [
+  #(January, #("January", "Jan")),
+  #(February, #("February", "Feb")),
+  #(March, #("March", "Mar")),
+  #(April, #("April", "Apr")),
+  #(May, #("May", "May")),
+  #(June, #("June", "Jun")),
+  #(July, #("July", "Jul")),
+  #(August, #("August", "Aug")),
+  #(September, #("September", "Sep")),
+  #(October, #("October", "Oct")),
+  #(November, #("November", "Nov")),
+  #(December, #("December", "Dec")),
+]
 
 if erlang {
   external fn ffi_now() -> Int =
