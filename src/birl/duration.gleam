@@ -162,7 +162,8 @@ const minute_units = ["m", "min", "minute", "minutes"]
 const second_units = ["s", "sec", "secs", "second", "seconds"]
 
 const milli_second_units = [
-  "ms", "msec", "msecs", "millisecond", "milliseconds",
+  "ms", "msec", "msecs", "millisecond", "milliseconds", "milli-second",
+  "milli-seconds", "milli_second", "milli_seconds",
 ]
 
 const units = [
@@ -178,7 +179,7 @@ const units = [
 
 /// You can use this function to create a new duration using expressions like:
 ///
-///     "accurate: 1 Year + 2days + 152M + 25 years + 25secs"
+///     "accurate: 1 Year - 2days + 152M -1h + 25 years + 25secs"
 ///
 /// where the units are:
 ///
@@ -201,44 +202,62 @@ const units = [
 /// Numbers with no unit are considered as microseconds.
 /// Specifying `accurate:` is equivalent to using `accurate_new`.
 pub fn parse(expression: String) -> Result(Duration, Nil) {
-  let assert Ok(re) = regex.from_string("(\\d+)\\s*(\\w+)")
+  let assert Ok(re) = regex.from_string("([+|\\-])?\\s*(\\d+)\\s*(\\w+)?")
 
-  let #(accurate, expression) = case
+  let #(constructor, expression) = case
     string.starts_with(expression, "accurate:")
   {
     True -> {
       let [_, expression] = string.split(expression, ":")
-      #(True, expression)
+      #(accurate_new, expression)
     }
-    False -> #(False, expression)
+    False -> #(new, expression)
   }
 
   case
     expression
-    |> string.split("+")
-    |> list.map(string.trim)
-    |> list.map(string.lowercase)
-    |> list.map(regex.scan(re, _))
+    |> string.lowercase
+    |> regex.scan(re, _)
     |> list.try_map(fn(item) {
       case item {
-        [regex.Match(_, [option.Some(amount_string), option.Some(unit)])] -> {
+        regex.Match(_, [sign_option, option.Some(amount_string)]) -> {
+          use amount <- result.then(int.parse(amount_string))
+          #(
+            case sign_option {
+              option.None | option.Some("+") -> amount
+              option.Some("-") -> -1 * amount
+            },
+            MicroSecond,
+          )
+          |> Ok
+        }
+
+        regex.Match(
+          _,
+          [sign_option, option.Some(amount_string), option.Some(unit)],
+        ) -> {
           use amount <- result.then(int.parse(amount_string))
           use #(unit, _) <- result.then(list.find(
             units,
             fn(item) { list.contains(item.1, unit) },
           ))
-          #(amount, unit)
+          #(
+            case sign_option {
+              option.None | option.Some("+") -> amount
+              option.Some("-") -> -1 * amount
+            },
+            unit,
+          )
           |> Ok
         }
+
         _ -> Error(Nil)
       }
     })
   {
     Ok(values) ->
-      case accurate {
-        True -> accurate_new(values)
-        False -> new(values)
-      }
+      values
+      |> constructor
       |> Ok
 
     Error(Nil) -> Error(Nil)
