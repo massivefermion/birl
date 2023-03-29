@@ -401,21 +401,39 @@ pub fn short_string_month(value: Time) -> String {
   month
 }
 
-pub fn range(a: Time, b: Time, s: duration.Duration) -> iterator.Iterator(Time) {
-  let assert Ok(range) =
-    ranger.create(
-      validate: fn(_) { True },
-      negate_step: fn(duration) {
-        let duration.Duration(value) = duration
-        duration.Duration(-1 * value)
-      },
-      add: add,
-      compare: compare,
-    )(
-      a,
-      b,
-      s,
-    )
+/// can be used to create a time range starting from time a with step s
+///
+/// if b is `option.None` the range will be infinite
+pub fn range(
+  from a: Time,
+  to b: option.Option(Time),
+  step s: duration.Duration,
+) -> iterator.Iterator(Time) {
+  let assert Ok(range) = case b {
+    option.Some(b) ->
+      ranger.create(
+        validate: fn(_) { True },
+        negate_step: fn(duration) {
+          let duration.Duration(value) = duration
+          duration.Duration(-1 * value)
+        },
+        add: add,
+        compare: compare,
+      )(
+        a,
+        b,
+        s,
+      )
+    option.None ->
+      ranger.create_infinite(
+        validate: fn(_) { True },
+        add: add,
+        compare: compare,
+      )(
+        a,
+        s,
+      )
+  }
   range
   |> ranger.unwrap
 }
