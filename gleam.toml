@@ -1,5 +1,5 @@
 name = "birl"
-version = "0.7.0"
+version = "0.7.1"
 
 description = "datetime handling for gleam"
 licences = ["Apache-2.0"]
@@ -8,7 +8,7 @@ repository = {type = "github", user = "massivefermion", repo = "birl"}
 
 [dependencies]
 gleam_stdlib = "~> 0.28"
-ranger = "~> 0.1"
+ranger = "~> 0.2"
 
 [dev-dependencies]
 gleeunit = "~> 0.10"

@@ -403,7 +403,7 @@ pub fn short_string_month(value: Time) -> String {
 
 pub fn range(a: Time, b: Time, s: duration.Duration) -> iterator.Iterator(Time) {
   let assert Ok(range) =
-    ranger.create(ranger.Options(
+    ranger.create(
       validate: fn(_) { True },
       negate_step: fn(duration) {
         let duration.Duration(value) = duration
@@ -411,7 +411,7 @@ pub fn range(a: Time, b: Time, s: duration.Duration) -> iterator.Iterator(Time) 
       },
       add: add,
       compare: compare,
-    ))(
+    )(
       a,
       b,
       s,
