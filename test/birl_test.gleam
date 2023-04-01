@@ -4,9 +4,9 @@ import gleeunit/should
 import birl/time
 import birl/duration
 
-const iso_datetime = "2022-12-22T16:38:23.000+03:30"
+const iso_datetime = "1905-12-22T16:38:23.000+03:30"
 
-const datetime_in_parts = #(#(2022, 12, 22), #(16, 38, 23, 0))
+const datetime_in_parts = #(#(1905, 12, 22), #(16, 38, 23, 0), "+03:30")
 
 pub fn main() {
   gleeunit.main()
@@ -47,15 +47,29 @@ pub fn equality_test() {
 }
 
 pub fn to_parts_test() {
-  time.from_iso8601(iso_datetime)
-  |> should.be_ok
-  |> time.to_parts
-  |> should.equal(#(#(2022, 12, 22), #(16, 38, 23, 0), "+03:30"))
+  let time =
+    time.from_iso8601(iso_datetime)
+    |> should.be_ok
+
+  time
+  |> time.get_date
+  |> should.equal(datetime_in_parts.0)
+
+  time
+  |> time.get_time
+  |> should.equal(datetime_in_parts.1)
+
+  time
+  |> time.get_offset
+  |> should.equal(datetime_in_parts.2)
 }
 
 pub fn from_parts_test() {
-  time.from_parts(datetime_in_parts.0, datetime_in_parts.1, "+03:30")
+  time.unix_epoch
+  |> time.set_offset(datetime_in_parts.2)
   |> should.be_ok
+  |> time.set_date(datetime_in_parts.0)
+  |> time.set_time(datetime_in_parts.1)
   |> time.to_iso8601
   |> should.equal(iso_datetime)
 }

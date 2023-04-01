@@ -32,13 +32,23 @@ to_parts(Timestamp, Offset) ->
         Timestamp + Offset, microsecond
     ),
     MilliSecond = (Timestamp rem 1_000_000) div 1_000,
-    {Date, {Hour, Minute, Second, MilliSecond}}.
+    {Date,
+        {Hour, Minute, Second,
+            if
+                MilliSecond == 0 -> MilliSecond;
+                Timestamp >= 0 -> MilliSecond;
+                true -> 1000 + MilliSecond
+            end}}.
 
 from_parts(Parts, Offset) ->
     {{Year, Month, Day}, {Hour, Minute, Second, MilliSecond}} = Parts,
     DaysInYears = calculate_days_from_year(Year - 1, 0),
     DaysInMonths = calculate_days_from_month(Year, Month - 1, 0),
-    Days = DaysInYears + DaysInMonths + Day - 1,
+    Days =
+        if
+            DaysInYears >= 0 -> DaysInYears + DaysInMonths + Day - 1;
+            true -> DaysInYears + DaysInMonths + Day
+        end,
     Seconds = (Days * 3600 * 24) + (Hour * 3600) + (Minute * 60) + Second,
     Seconds * 1_000_000 + MilliSecond * 1_000 - Offset.
 

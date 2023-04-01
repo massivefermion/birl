@@ -15,6 +15,9 @@ pub opaque type Time {
   Time(wall_time: Int, offset: Int, monotonic_time: option.Option(Int))
 }
 
+/// starting point of unix timestamps
+pub const unix_epoch = Time(0, 0, option.None)
+
 pub type Weekday {
   Monday
   Tuesday
@@ -65,43 +68,6 @@ pub fn now_with_offset(offset: String) -> Result(Time, Nil) {
   let now = ffi_now()
   let monotonic_now = ffi_monotonic_now()
   Time(now, offset, option.Some(monotonic_now))
-  |> Ok
-}
-
-/// use this tp change the offset of a given time value.
-///
-/// Some examples of acceptable offsets:
-///
-/// `"+330", "03:30", "-8:00","-7", "-0400", "03"`
-pub fn change_offset(value: Time, new_offset: String) -> Result(Time, Nil) {
-  use new_offset_number <- result.then(parse_offset(new_offset))
-  case value {
-    Time(wall_time: t, offset: _, monotonic_time: mt) ->
-      Time(t, new_offset_number, mt)
-      |> Ok
-  }
-}
-
-pub fn to_parts(
-  value: Time,
-) -> #(#(Int, Int, Int), #(Int, Int, Int, Int), String) {
-  case value {
-    Time(wall_time: t, offset: o, monotonic_time: _) -> {
-      let #(date, time) = ffi_to_parts(t, o)
-      let assert Ok(offset) = generate_offset(o)
-      #(date, time, offset)
-    }
-  }
-}
-
-pub fn from_parts(
-  date: #(Int, Int, Int),
-  time: #(Int, Int, Int, Int),
-  offset: String,
-) -> Result(Time, Nil) {
-  use offset_number <- result.then(parse_offset(offset))
-  ffi_from_parts(#(date, time), offset_number)
-  |> Time(offset_number, option.None)
   |> Ok
 }
 
@@ -204,7 +170,7 @@ pub fn from_iso8601(value: String) -> Result(Time, Nil) {
 
 /// see [here](https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/Date)
 pub fn to_http(value: Time) -> String {
-  let assert Ok(utc_value) = change_offset(value, "Z")
+  let assert Ok(utc_value) = set_offset(value, "Z")
 
   let #(#(year, _, day), #(hour, minute, second, _), _) = to_parts(utc_value)
   let short_weekday = short_string_weekday(utc_value)
@@ -419,23 +385,79 @@ pub fn range(
         },
         add: add,
         compare: compare,
-      )(
-        a,
-        b,
-        s,
-      )
+      )(a, b, s)
     option.None ->
       ranger.create_infinite(
         validate: fn(_) { True },
         add: add,
         compare: compare,
-      )(
-        a,
-        s,
-      )
+      )(a, s)
   }
   range
   |> ranger.unwrap
+}
+
+/// use this tp change the offset of a given time value.
+///
+/// Some examples of acceptable offsets:
+///
+/// `"+330", "03:30", "-8:00","-7", "-0400", "03", "Z"`
+pub fn set_offset(value: Time, new_offset: String) -> Result(Time, Nil) {
+  use new_offset_number <- result.then(parse_offset(new_offset))
+  case value {
+    Time(wall_time: t, offset: _, monotonic_time: mt) ->
+      Time(t, new_offset_number, mt)
+      |> Ok
+  }
+}
+
+pub fn get_offset(value: Time) -> String {
+  let Time(_, offset, _) = value
+  let assert Ok(offset) = generate_offset(offset)
+  offset
+}
+
+pub fn set_date(value: Time, new_date: #(Int, Int, Int)) -> Time {
+  let #(_, time, offset) = to_parts(value)
+  let assert Ok(new_value) = from_parts(new_date, time, offset)
+  new_value
+}
+
+pub fn get_date(value: Time) -> #(Int, Int, Int) {
+  let #(date, _, _) = to_parts(value)
+  date
+}
+
+pub fn set_time(value: Time, new_time: #(Int, Int, Int, Int)) -> Time {
+  let #(date, _, offset) = to_parts(value)
+  let assert Ok(new_value) = from_parts(date, new_time, offset)
+  new_value
+}
+
+pub fn get_time(value: Time) -> #(Int, Int, Int, Int) {
+  let #(_, time, _) = to_parts(value)
+  time
+}
+
+fn to_parts(value: Time) -> #(#(Int, Int, Int), #(Int, Int, Int, Int), String) {
+  case value {
+    Time(wall_time: t, offset: o, monotonic_time: _) -> {
+      let #(date, time) = ffi_to_parts(t, o)
+      let assert Ok(offset) = generate_offset(o)
+      #(date, time, offset)
+    }
+  }
+}
+
+fn from_parts(
+  date: #(Int, Int, Int),
+  time: #(Int, Int, Int, Int),
+  offset: String,
+) -> Result(Time, Nil) {
+  use offset_number <- result.then(parse_offset(offset))
+  ffi_from_parts(#(date, time), offset_number)
+  |> Time(offset_number, option.None)
+  |> Ok
 }
 
 fn parse_offset(offset: String) -> Result(Int, Nil) {
