@@ -6,7 +6,21 @@ import birl/duration
 
 const iso_datetime = "1905-12-22T16:38:23.000+03:30"
 
-const datetime_in_parts = #(#(1905, 12, 22), #(16, 38, 23, 0), "+03:30")
+const year = 1905
+
+const month = 12
+
+const day = 22
+
+const hour = 16
+
+const minute = 38
+
+const second = 23
+
+const milli_second = 0
+
+const offset = "+03:30"
 
 pub fn main() {
   gleeunit.main()
@@ -53,23 +67,23 @@ pub fn to_parts_test() {
 
   time
   |> time.get_date
-  |> should.equal(datetime_in_parts.0)
+  |> should.equal(time.Date(year, month, day))
 
   time
   |> time.get_time
-  |> should.equal(datetime_in_parts.1)
+  |> should.equal(time.Time(hour, minute, second, milli_second))
 
   time
   |> time.get_offset
-  |> should.equal(datetime_in_parts.2)
+  |> should.equal(offset)
 }
 
 pub fn from_parts_test() {
   time.unix_epoch
-  |> time.set_offset(datetime_in_parts.2)
+  |> time.set_offset(offset)
   |> should.be_ok
-  |> time.set_date(datetime_in_parts.0)
-  |> time.set_time(datetime_in_parts.1)
+  |> time.set_date(time.Date(year, month, day))
+  |> time.set_time(time.Time(hour, minute, second, milli_second))
   |> time.to_iso8601
   |> should.equal(iso_datetime)
 }

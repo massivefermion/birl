@@ -11,51 +11,59 @@ import gleam/iterator
 import birl/duration
 import ranger
 
-pub opaque type Time {
-  Time(wall_time: Int, offset: Int, monotonic_time: option.Option(Int))
+pub opaque type DateTime {
+  DateTime(wall_time: Int, offset: Int, monotonic_time: option.Option(Int))
+}
+
+pub type Date {
+  Date(day: Int, month: Int, year: Int)
+}
+
+pub type Time {
+  Time(hour: Int, minute: Int, second: Int, milli_second: Int)
 }
 
 /// starting point of unix timestamps
-pub const unix_epoch = Time(0, 0, option.None)
+pub const unix_epoch = DateTime(0, 0, option.None)
 
 pub type Weekday {
-  Monday
-  Tuesday
-  Wednesday
-  Thursday
-  Friday
-  Saturday
-  Sunday
+  Mon
+  Tue
+  Wed
+  Thu
+  Fri
+  Sat
+  Sun
 }
 
 pub type Month {
-  January
-  February
-  March
-  April
+  Jan
+  Feb
+  Mar
+  Apr
   May
-  June
-  July
-  August
-  September
-  October
-  November
-  December
+  Jun
+  Jul
+  Aug
+  Sep
+  Oct
+  Nov
+  Dec
 }
 
 /// use this to get the current time in the local timezone offset
-pub fn now() -> Time {
+pub fn now() -> DateTime {
   let now = ffi_now()
   let offset_in_minutes = ffi_local_offset()
   let monotonic_now = ffi_monotonic_now()
-  Time(now, offset_in_minutes * 60_000_000, option.Some(monotonic_now))
+  DateTime(now, offset_in_minutes * 60_000_000, option.Some(monotonic_now))
 }
 
 /// use this to get the current time in utc
-pub fn utc_now() -> Time {
+pub fn utc_now() -> DateTime {
   let now = ffi_now()
   let monotonic_now = ffi_monotonic_now()
-  Time(now, 0, option.Some(monotonic_now))
+  DateTime(now, 0, option.Some(monotonic_now))
 }
 
 /// use this to get the current time with a given offset.
@@ -63,15 +71,19 @@ pub fn utc_now() -> Time {
 /// Some examples of acceptable offsets:
 ///
 /// `"+330", "03:30", "-8:00","-7", "-0400", "03"`
-pub fn now_with_offset(offset: String) -> Result(Time, Nil) {
+pub fn now_with_offset(offset: String) -> Result(DateTime, Nil) {
   use offset <- result.then(parse_offset(offset))
   let now = ffi_now()
   let monotonic_now = ffi_monotonic_now()
-  Time(now, offset, option.Some(monotonic_now))
+  DateTime(now, offset, option.Some(monotonic_now))
   |> Ok
 }
 
-pub fn to_iso8601(value: Time) -> String {
+pub fn monotonic_now() -> Int {
+  ffi_monotonic_now()
+}
+
+pub fn to_iso8601(value: DateTime) -> String {
   let #(#(year, month, day), #(hour, minute, second, milli_second), offset) =
     to_parts(value)
 
@@ -102,7 +114,7 @@ pub fn to_iso8601(value: Time) -> String {
   } <> offset
 }
 
-pub fn from_iso8601(value: String) -> Result(Time, Nil) {
+pub fn from_iso8601(value: String) -> Result(DateTime, Nil) {
   let assert Ok(offset_pattern) = regex.from_string("(.*)([+|\\-].*)")
   let value = string.trim(value)
 
@@ -157,8 +169,8 @@ pub fn from_iso8601(value: String) -> Result(Time, Nil) {
           offset_string,
         )
       {
-        Ok(Time(timestamp, offset, option.None)) ->
-          Ok(Time(timestamp, offset, option.None))
+        Ok(DateTime(timestamp, offset, option.None)) ->
+          Ok(DateTime(timestamp, offset, option.None))
 
         Error(Nil) -> Error(Nil)
       }
@@ -169,7 +181,7 @@ pub fn from_iso8601(value: String) -> Result(Time, Nil) {
 }
 
 /// see [here](https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/Date)
-pub fn to_http(value: Time) -> String {
+pub fn to_http(value: DateTime) -> String {
   let assert Ok(utc_value) = set_offset(value, "Z")
 
   let #(#(year, _, day), #(hour, minute, second, _), _) = to_parts(utc_value)
@@ -196,7 +208,7 @@ pub fn to_http(value: Time) -> String {
 }
 
 /// see [here](https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/Date)
-pub fn from_http(value: String) -> Result(Time, Nil) {
+pub fn from_http(value: String) -> Result(DateTime, Nil) {
   let value = string.trim(value)
   let [weekday, rest] = string.split(value, ",")
   use <- bool.guard(
@@ -256,20 +268,20 @@ pub fn from_http(value: String) -> Result(Time, Nil) {
 }
 
 /// unix timestamps are the number of seconds that have elapsed since 00:00:00 UTC on January 1st, 1970
-pub fn to_unix(value: Time) -> Int {
+pub fn to_unix(value: DateTime) -> Int {
   case value {
-    Time(t, _, _) -> t / 1_000_000
+    DateTime(t, _, _) -> t / 1_000_000
   }
 }
 
 /// unix timestamps are the number of seconds that have elapsed since 00:00:00 UTC on January 1st, 1970
-pub fn from_unix(value: Int) -> Time {
-  Time(value * 1_000_000, 0, option.None)
+pub fn from_unix(value: Int) -> DateTime {
+  DateTime(value * 1_000_000, 0, option.None)
 }
 
-pub fn compare(a: Time, b: Time) -> order.Order {
-  let Time(wall_time: wta, offset: _, monotonic_time: mta) = a
-  let Time(wall_time: wtb, offset: _, monotonic_time: mtb) = b
+pub fn compare(a: DateTime, b: DateTime) -> order.Order {
+  let DateTime(wall_time: wta, offset: _, monotonic_time: mta) = a
+  let DateTime(wall_time: wtb, offset: _, monotonic_time: mtb) = b
 
   let #(ta, tb) = case #(mta, mtb) {
     #(option.Some(ta), option.Some(tb)) -> #(ta, tb)
@@ -286,9 +298,9 @@ pub fn compare(a: Time, b: Time) -> order.Order {
   }
 }
 
-pub fn difference(a: Time, b: Time) -> duration.Duration {
-  let Time(wall_time: wta, offset: _, monotonic_time: mta) = a
-  let Time(wall_time: wtb, offset: _, monotonic_time: mtb) = b
+pub fn difference(a: DateTime, b: DateTime) -> duration.Duration {
+  let DateTime(wall_time: wta, offset: _, monotonic_time: mta) = a
+  let DateTime(wall_time: wtb, offset: _, monotonic_time: mtb) = b
 
   let #(ta, tb) = case #(mta, mtb) {
     #(option.Some(ta), option.Some(tb)) -> #(ta, tb)
@@ -298,83 +310,83 @@ pub fn difference(a: Time, b: Time) -> duration.Duration {
   duration.Duration(ta - tb)
 }
 
-pub fn add(value: Time, duration: duration.Duration) -> Time {
-  let Time(wall_time: wt, offset: o, monotonic_time: mt) = value
+pub fn add(value: DateTime, duration: duration.Duration) -> DateTime {
+  let DateTime(wall_time: wt, offset: o, monotonic_time: mt) = value
   let duration.Duration(duration) = duration
   case mt {
     option.Some(mt) ->
-      Time(
+      DateTime(
         wall_time: wt + duration,
         offset: o,
         monotonic_time: option.Some(mt + duration),
       )
     option.None ->
-      Time(wall_time: wt + duration, offset: o, monotonic_time: option.None)
+      DateTime(wall_time: wt + duration, offset: o, monotonic_time: option.None)
   }
 }
 
-pub fn subtract(value: Time, duration: duration.Duration) -> Time {
-  let Time(wall_time: wt, offset: o, monotonic_time: mt) = value
+pub fn subtract(value: DateTime, duration: duration.Duration) -> DateTime {
+  let DateTime(wall_time: wt, offset: o, monotonic_time: mt) = value
   let duration.Duration(duration) = duration
   case mt {
     option.Some(mt) ->
-      Time(
+      DateTime(
         wall_time: wt - duration,
         offset: o,
         monotonic_time: option.Some(mt - duration),
       )
     option.None ->
-      Time(wall_time: wt - duration, offset: o, monotonic_time: option.None)
+      DateTime(wall_time: wt - duration, offset: o, monotonic_time: option.None)
   }
 }
 
-pub fn weekday(value: Time) -> Weekday {
+pub fn weekday(value: DateTime) -> Weekday {
   case value {
-    Time(wall_time: t, offset: o, monotonic_time: _) -> {
+    DateTime(wall_time: t, offset: o, monotonic_time: _) -> {
       let assert Ok(weekday) = list.at(weekdays, ffi_weekday(t, o))
       weekday
     }
   }
 }
 
-pub fn string_weekday(value: Time) -> String {
+pub fn string_weekday(value: DateTime) -> String {
   let weekday = weekday(value)
   let assert Ok(#(weekday, _)) = list.key_find(weekday_strings, weekday)
   weekday
 }
 
-pub fn short_string_weekday(value: Time) -> String {
+pub fn short_string_weekday(value: DateTime) -> String {
   let weekday = weekday(value)
   let assert Ok(#(_, weekday)) = list.key_find(weekday_strings, weekday)
   weekday
 }
 
-pub fn month(value: Time) -> Month {
+pub fn month(value: DateTime) -> Month {
   let #(#(_, month, _), _, _) = to_parts(value)
   let assert Ok(month) = list.at(months, month - 1)
   month
 }
 
-pub fn string_month(value: Time) -> String {
+pub fn string_month(value: DateTime) -> String {
   let month = month(value)
   let assert Ok(#(month, _)) = list.key_find(month_strings, month)
   month
 }
 
-pub fn short_string_month(value: Time) -> String {
+pub fn short_string_month(value: DateTime) -> String {
   let month = month(value)
   let assert Ok(#(_, month)) = list.key_find(month_strings, month)
   month
 }
 
-/// can be used to create a time range starting from time a with step s
+/// can be used to create a time range starting from time `a` with step `s`
 ///
-/// if b is `option.None` the range will be infinite
+/// if `b` is `option.None` the range will be infinite
 pub fn range(
-  from a: Time,
-  to b: option.Option(Time),
+  from a: DateTime,
+  to b: option.Option(DateTime),
   step s: duration.Duration,
-) -> iterator.Iterator(Time) {
+) -> iterator.Iterator(DateTime) {
   let assert Ok(range) = case b {
     option.Some(b) ->
       ranger.create(
@@ -402,46 +414,95 @@ pub fn range(
 /// Some examples of acceptable offsets:
 ///
 /// `"+330", "03:30", "-8:00","-7", "-0400", "03", "Z"`
-pub fn set_offset(value: Time, new_offset: String) -> Result(Time, Nil) {
+pub fn set_offset(value: DateTime, new_offset: String) -> Result(DateTime, Nil) {
   use new_offset_number <- result.then(parse_offset(new_offset))
   case value {
-    Time(wall_time: t, offset: _, monotonic_time: mt) ->
-      Time(t, new_offset_number, mt)
+    DateTime(wall_time: t, offset: _, monotonic_time: mt) ->
+      DateTime(t, new_offset_number, mt)
       |> Ok
   }
 }
 
-pub fn get_offset(value: Time) -> String {
-  let Time(_, offset, _) = value
+pub fn get_offset(value: DateTime) -> String {
+  let DateTime(_, offset, _) = value
   let assert Ok(offset) = generate_offset(offset)
   offset
 }
 
-pub fn set_date(value: Time, new_date: #(Int, Int, Int)) -> Time {
+pub fn set_date(value: DateTime, date: Date) -> DateTime {
   let #(_, time, offset) = to_parts(value)
-  let assert Ok(new_value) = from_parts(new_date, time, offset)
+  let Date(year, month, day) = date
+  let assert Ok(new_value) = from_parts(#(year, month, day), time, offset)
   new_value
 }
 
-pub fn get_date(value: Time) -> #(Int, Int, Int) {
-  let #(date, _, _) = to_parts(value)
-  date
+pub fn get_date(value: DateTime) -> Date {
+  let #(#(year, month, day), _, _) = to_parts(value)
+  Date(year, month, day)
 }
 
-pub fn set_time(value: Time, new_time: #(Int, Int, Int, Int)) -> Time {
+pub fn set_time(value: DateTime, time: Time) -> DateTime {
   let #(date, _, offset) = to_parts(value)
-  let assert Ok(new_value) = from_parts(date, new_time, offset)
+  let Time(hour, minute, second, milli_second) = time
+  let assert Ok(new_value) =
+    from_parts(date, #(hour, minute, second, milli_second), offset)
   new_value
 }
 
-pub fn get_time(value: Time) -> #(Int, Int, Int, Int) {
-  let #(_, time, _) = to_parts(value)
-  time
+pub fn get_time(value: DateTime) -> Time {
+  let #(_, #(hour, minute, second, milli_second), _) = to_parts(value)
+  Time(hour, minute, second, milli_second)
 }
 
-fn to_parts(value: Time) -> #(#(Int, Int, Int), #(Int, Int, Int, Int), String) {
+if erlang {
+  /// calculates erlang datetime using the offset in the DateTime value
+  pub fn to_erlang_datetime(
+    value: DateTime,
+  ) -> #(#(Int, Int, Int), #(Int, Int, Int)) {
+    let #(date, #(hour, minute, second, _), _) = to_parts(value)
+    #(date, #(hour, minute, second))
+  }
+
+  /// calculates the universal erlang datetime regardless of the offset in the DateTime value
+  pub fn to_erlang_universal_datetime(
+    value: DateTime,
+  ) -> #(#(Int, Int, Int), #(Int, Int, Int)) {
+    let assert Ok(value) = set_offset(value, "0")
+    let #(date, #(hour, minute, second, _), _) = to_parts(value)
+    #(date, #(hour, minute, second))
+  }
+
+  /// calculates the DateTime value from the erlang datetime using the local offset of the system
+  pub fn from_erlang_local_datetime(
+    erlang_datetime: #(#(Int, Int, Int), #(Int, Int, Int)),
+  ) -> DateTime {
+    let #(date, time) = erlang_datetime
+    let offset_in_minutes = ffi_local_offset()
+
+    let DateTime(wall_time, _, option.None) =
+      unix_epoch
+      |> set_date(Date(date.0, date.1, date.2))
+      |> set_time(Time(time.0, time.1, time.2, 0))
+
+    DateTime(wall_time, offset_in_minutes * 60_000_000, option.None)
+  }
+
+  /// calculates the DateTime value from the erlang datetime in UTC
+  pub fn from_erlang_universal_datetime(
+    erlang_datetime: #(#(Int, Int, Int), #(Int, Int, Int)),
+  ) -> DateTime {
+    let #(date, time) = erlang_datetime
+    unix_epoch
+    |> set_date(Date(date.0, date.1, date.2))
+    |> set_time(Time(time.0, time.1, time.2, 0))
+  }
+}
+
+fn to_parts(
+  value: DateTime,
+) -> #(#(Int, Int, Int), #(Int, Int, Int, Int), String) {
   case value {
-    Time(wall_time: t, offset: o, monotonic_time: _) -> {
+    DateTime(wall_time: t, offset: o, monotonic_time: _) -> {
       let #(date, time) = ffi_to_parts(t, o)
       let assert Ok(offset) = generate_offset(o)
       #(date, time, offset)
@@ -453,10 +514,10 @@ fn from_parts(
   date: #(Int, Int, Int),
   time: #(Int, Int, Int, Int),
   offset: String,
-) -> Result(Time, Nil) {
+) -> Result(DateTime, Nil) {
   use offset_number <- result.then(parse_offset(offset))
   ffi_from_parts(#(date, time), offset_number)
-  |> Time(offset_number, option.None)
+  |> DateTime(offset_number, option.None)
   |> Ok
 }
 
@@ -636,67 +697,38 @@ fn parse_iso_section(
 }
 
 if erlang {
-  const weekdays = [
-    Monday,
-    Tuesday,
-    Wednesday,
-    Thursday,
-    Friday,
-    Saturday,
-    Sunday,
-  ]
+  const weekdays = [Mon, Tue, Wed, Thu, Fri, Sat, Sun]
 }
 
 if javascript {
-  const weekdays = [
-    Sunday,
-    Monday,
-    Tuesday,
-    Wednesday,
-    Thursday,
-    Friday,
-    Saturday,
-  ]
+  const weekdays = [Sun, Mon, Tue, Wed, Thu, Fri, Sat]
 }
 
-const months = [
-  January,
-  February,
-  March,
-  April,
-  May,
-  June,
-  July,
-  August,
-  September,
-  October,
-  November,
-  December,
-]
+const months = [Jan, Feb, Mar, Apr, May, Jun, Jul, Aug, Sep, Oct, Nov, Dec]
 
 const weekday_strings = [
-  #(Monday, #("Monday", "Mon")),
-  #(Tuesday, #("Tuesday", "Tue")),
-  #(Wednesday, #("Wednesday", "Wed")),
-  #(Thursday, #("Thursday", "Thu")),
-  #(Friday, #("Friday", "Fri")),
-  #(Saturday, #("Saturday", "Sat")),
-  #(Sunday, #("Sunday", "Sun")),
+  #(Mon, #("Monday", "Mon")),
+  #(Tue, #("Tuesday", "Tue")),
+  #(Wed, #("Wednesday", "Wed")),
+  #(Thu, #("Thursday", "Thu")),
+  #(Fri, #("Friday", "Fri")),
+  #(Sat, #("Saturday", "Sat")),
+  #(Sun, #("Sunday", "Sun")),
 ]
 
 const month_strings = [
-  #(January, #("January", "Jan")),
-  #(February, #("February", "Feb")),
-  #(March, #("March", "Mar")),
-  #(April, #("April", "Apr")),
+  #(Jan, #("January", "Jan")),
+  #(Feb, #("February", "Feb")),
+  #(Mar, #("March", "Mar")),
+  #(Apr, #("April", "Apr")),
   #(May, #("May", "May")),
-  #(June, #("June", "Jun")),
-  #(July, #("July", "Jul")),
-  #(August, #("August", "Aug")),
-  #(September, #("September", "Sep")),
-  #(October, #("October", "Oct")),
-  #(November, #("November", "Nov")),
-  #(December, #("December", "Dec")),
+  #(Jun, #("June", "Jun")),
+  #(Jul, #("July", "Jul")),
+  #(Aug, #("August", "Aug")),
+  #(Sep, #("September", "Sep")),
+  #(Oct, #("October", "Oct")),
+  #(Nov, #("November", "Nov")),
+  #(Dec, #("December", "Dec")),
 ]
 
 if erlang {
