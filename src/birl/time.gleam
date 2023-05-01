@@ -310,6 +310,46 @@ pub fn difference(a: DateTime, b: DateTime) -> duration.Duration {
   duration.Duration(ta - tb)
 }
 
+const units = [
+  #(duration.Year, #("year", "years")),
+  #(duration.Month, #("month", "months")),
+  #(duration.Week, #("week", "weeks")),
+  #(duration.Day, #("day", "days")),
+  #(duration.Hour, #("hour", "hours")),
+  #(duration.Minute, #("minute", "minutes")),
+  #(duration.Second, #("second", "seconds")),
+]
+
+pub fn legible_difference(a: DateTime, b: DateTime) -> String {
+  case
+    difference(a, b)
+    |> duration.decompose
+    |> list.at(0)
+  {
+    Ok(#(_, duration.MicroSecond)) | Ok(#(_, duration.MilliSecond)) | Error(Nil) ->
+      "just now"
+
+    Ok(#(amount, unit)) -> {
+      let assert Ok(string_units) = list.key_find(units, unit)
+      let is_negative = amount < 0
+      let amount = int.absolute_value(amount)
+
+      let unit = case amount {
+        1 -> string_units.0
+        _ -> string_units.1
+      }
+
+      case is_negative {
+        True -> "in " <> int.to_string(amount) <> " " <> unit
+        False ->
+          amount
+          |> int.absolute_value
+          |> int.to_string <> " " <> unit <> " ago"
+      }
+    }
+  }
+}
+
 pub fn add(value: DateTime, duration: duration.Duration) -> DateTime {
   let DateTime(wall_time: wt, offset: o, monotonic_time: mt) = value
   let duration.Duration(duration) = duration
