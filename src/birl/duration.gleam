@@ -41,6 +41,40 @@ const accurate_month = 2_629_746_000_000
 
 const accurate_year = 31_556_952_000_000
 
+pub fn add(a: Duration, b: Duration) -> Duration {
+  let Duration(a) = a
+  let Duration(b) = b
+  Duration(a + b)
+}
+
+pub fn seconds(value: Int) -> Duration {
+  Duration(value * second)
+}
+
+pub fn minutes(value: Int) -> Duration {
+  Duration(value * minute)
+}
+
+pub fn hours(value: Int) -> Duration {
+  Duration(value * hour)
+}
+
+pub fn days(value: Int) -> Duration {
+  Duration(value * day)
+}
+
+pub fn weeks(value: Int) -> Duration {
+  Duration(value * week)
+}
+
+pub fn months(value: Int) -> Duration {
+  Duration(value * month)
+}
+
+pub fn years(value: Int) -> Duration {
+  Duration(value * year)
+}
+
 /// Use this if you need short durations where a year just means 365 days and a month just means 30 days
 pub fn new(values: List(#(Int, Unit))) -> Duration {
   values

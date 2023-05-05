@@ -126,8 +126,14 @@ pub fn from_iso8601(value: String) -> Result(DateTime, Nil) {
     )
   }
 
+  let date_string = string.trim(date_string)
+  let offsetted_time_string = string.trim(offsetted_time_string)
+
   let #(time_string, offset_string) = case
-    string.ends_with(offsetted_time_string, "Z")
+    string.ends_with(offsetted_time_string, "Z") || string.ends_with(
+      offsetted_time_string,
+      "z",
+    )
   {
     True -> #(string.drop_right(offsetted_time_string, 1), "+00:00")
     False ->
@@ -182,11 +188,10 @@ pub fn from_iso8601(value: String) -> Result(DateTime, Nil) {
 
 /// see [here](https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/Date)
 pub fn to_http(value: DateTime) -> String {
-  let assert Ok(utc_value) = set_offset(value, "Z")
-
-  let #(#(year, _, day), #(hour, minute, second, _), _) = to_parts(utc_value)
-  let short_weekday = short_string_weekday(utc_value)
-  let short_month = short_string_month(utc_value)
+  let assert Ok(value) = set_offset(value, "Z")
+  let #(#(year, _, day), #(hour, minute, second, _), _) = to_parts(value)
+  let short_weekday = short_string_weekday(value)
+  let short_month = short_string_month(value)
 
   short_weekday <> ", " <> {
     day
@@ -207,20 +212,60 @@ pub fn to_http(value: DateTime) -> String {
   } <> " GMT"
 }
 
+/// like `to_http` but assumes the offset in the DateTime value instead of `GMT`
+pub fn to_http_with_offset(value: DateTime) -> String {
+  let #(#(year, _, day), #(hour, minute, second, _), offset) = to_parts(value)
+  let short_weekday = short_string_weekday(value)
+  let short_month = short_string_month(value)
+
+  let offset = case offset {
+    "Z" -> "GMT"
+    _ -> offset
+  }
+
+  short_weekday <> ", " <> {
+    day
+    |> int.to_string
+    |> string.pad_left(2, "0")
+  } <> " " <> short_month <> " " <> int.to_string(year) <> " " <> {
+    hour
+    |> int.to_string
+    |> string.pad_left(2, "0")
+  } <> ":" <> {
+    minute
+    |> int.to_string
+    |> string.pad_left(2, "0")
+  } <> ":" <> {
+    second
+    |> int.to_string
+    |> string.pad_left(2, "0")
+  } <> " " <> offset
+}
+
 /// see [here](https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/Date)
+///
+/// also supports other similar formats:
+///
+/// `Tue, 01-Nov-2016 08:49:37 GMT`
+///
+/// `Tue, 01 Nov 2016 08:49:37 +0630`
+///
+/// `Tue, 01-November-2016 08:49:37 Z`
+///
+/// `Tuesday, 01-Nov-2016 08:49:37 +330`
+///
+/// `Tuesday, 01 November 2016 08:49:37 +06:30`
 pub fn from_http(value: String) -> Result(DateTime, Nil) {
   let value = string.trim(value)
   let [weekday, rest] = string.split(value, ",")
+
   use <- bool.guard(
-    !list.contains(
-      list.map(
-        weekday_strings,
-        fn(weekday) {
-          let strings = weekday.1
-          strings.1
-        },
-      ),
-      weekday,
+    !list.any(
+      weekday_strings,
+      fn(weekday_item) {
+        let strings = weekday_item.1
+        strings.0 == weekday || strings.1 == weekday
+      },
     ),
     Error(Nil),
   )
@@ -228,7 +273,7 @@ pub fn from_http(value: String) -> Result(DateTime, Nil) {
   let rest = string.trim(rest)
   let assert Ok(whitespace_pattern) = regex.from_string("\\s+")
   case regex.split(whitespace_pattern, rest) {
-    [day_string, short_month, year_string, time_string, "GMT"] -> {
+    [day_string, month_string, year_string, time_string, offset_string] -> {
       let time_string = string.replace(time_string, ":", "")
       case
         #(
@@ -236,24 +281,38 @@ pub fn from_http(value: String) -> Result(DateTime, Nil) {
           month_strings
           |> list.index_map(fn(index, month) {
             let strings = month.1
-            #(index, strings.1)
+            #(index, strings.0, strings.1)
           })
-          |> list.find(fn(month) { month.1 == short_month }),
+          |> list.find(fn(month) {
+            month.1 == month_string || month.2 == month_string
+          }),
           int.parse(year_string),
           parse_time(time_string),
         )
       {
-        #(Ok(day), Ok(#(month_index, _)), Ok(year), Ok([hour, minute, second])) ->
+        #(
+          Ok(day),
+          Ok(#(month_index, _, _)),
+          Ok(year),
+          Ok([hour, minute, second]),
+        ) ->
           case
             from_parts(
               #(year, month_index + 1, day),
               #(hour, minute, second, 0),
-              "Z",
+              case offset_string {
+                "GMT" -> "Z"
+                _ -> offset_string
+              },
             )
           {
             Ok(value) -> {
-              let correct_weekday = short_string_weekday(value)
-              case correct_weekday == weekday {
+              let correct_weekday = string_weekday(value)
+              let correct_short_weekday = short_string_weekday(value)
+
+              case
+                list.contains([correct_weekday, correct_short_weekday], weekday)
+              {
                 True -> Ok(value)
                 False -> Error(Nil)
               }
@@ -263,6 +322,64 @@ pub fn from_http(value: String) -> Result(DateTime, Nil) {
         _ -> Error(Nil)
       }
     }
+
+    [date_string, time_string, offset_string] ->
+      case string.split(date_string, "-") {
+        [day_string, month_string, year_string] -> {
+          let time_string = string.replace(time_string, ":", "")
+          case
+            #(
+              int.parse(day_string),
+              month_strings
+              |> list.index_map(fn(index, month) {
+                let strings = month.1
+                #(index, strings.0, strings.1)
+              })
+              |> list.find(fn(month) {
+                month.1 == month_string || month.2 == month_string
+              }),
+              int.parse(year_string),
+              parse_time(time_string),
+            )
+          {
+            #(
+              Ok(day),
+              Ok(#(month_index, _, _)),
+              Ok(year),
+              Ok([hour, minute, second]),
+            ) ->
+              case
+                from_parts(
+                  #(year, month_index + 1, day),
+                  #(hour, minute, second, 0),
+                  case offset_string {
+                    "GMT" -> "Z"
+                    _ -> offset_string
+                  },
+                )
+              {
+                Ok(value) -> {
+                  let correct_weekday = string_weekday(value)
+                  let correct_short_weekday = short_string_weekday(value)
+
+                  case
+                    list.contains(
+                      [correct_weekday, correct_short_weekday],
+                      weekday,
+                    )
+                  {
+                    True -> Ok(value)
+                    False -> Error(Nil)
+                  }
+                }
+                Error(Nil) -> Error(Nil)
+              }
+            _ -> Error(Nil)
+          }
+        }
+        _ -> Error(Nil)
+      }
+
     _ -> Error(Nil)
   }
 }
@@ -507,7 +624,7 @@ if erlang {
   pub fn to_erlang_universal_datetime(
     value: DateTime,
   ) -> #(#(Int, Int, Int), #(Int, Int, Int)) {
-    let assert Ok(value) = set_offset(value, "0")
+    let assert Ok(value) = set_offset(value, "Z")
     let #(date, #(hour, minute, second, _), _) = to_parts(value)
     #(date, #(hour, minute, second))
   }
