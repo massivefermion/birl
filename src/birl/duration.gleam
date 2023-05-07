@@ -1,4 +1,5 @@
 import gleam/int
+import gleam/bool
 import gleam/list
 import gleam/regex
 import gleam/string
@@ -125,6 +126,7 @@ pub fn decompose(duration: Duration) -> List(#(Int, Unit)) {
   let absolute_value = int.absolute_value(value)
   let #(years, remaining) = extract(absolute_value, year)
   let #(months, remaining) = extract(remaining, month)
+  let #(weeks, remaining) = extract(remaining, week)
   let #(days, remaining) = extract(remaining, day)
   let #(hours, remaining) = extract(remaining, hour)
   let #(minutes, remaining) = extract(remaining, minute)
@@ -134,6 +136,7 @@ pub fn decompose(duration: Duration) -> List(#(Int, Unit)) {
   [
     #(years, Year),
     #(months, Month),
+    #(weeks, Week),
     #(days, Day),
     #(hours, Hour),
     #(minutes, Minute),
@@ -156,6 +159,7 @@ pub fn accurate_decompose(duration: Duration) -> List(#(Int, Unit)) {
   let absolute_value = int.absolute_value(value)
   let #(years, remaining) = extract(absolute_value, accurate_year)
   let #(months, remaining) = extract(remaining, accurate_month)
+  let #(weeks, remaining) = extract(remaining, week)
   let #(days, remaining) = extract(remaining, day)
   let #(hours, remaining) = extract(remaining, hour)
   let #(minutes, remaining) = extract(remaining, minute)
@@ -165,6 +169,7 @@ pub fn accurate_decompose(duration: Duration) -> List(#(Int, Unit)) {
   [
     #(years, Year),
     #(months, Month),
+    #(weeks, Week),
     #(days, Day),
     #(hours, Hour),
     #(minutes, Minute),
@@ -179,6 +184,44 @@ pub fn accurate_decompose(duration: Duration) -> List(#(Int, Unit)) {
       False -> item
     }
   })
+}
+
+/// approximates the duration by a value in a single unit
+pub fn blur(duration: Duration) -> #(Int, Unit) {
+  duration
+  |> decompose
+  |> list.reverse
+  |> inner_blur
+}
+
+const unit_values = [
+  #(Year, year),
+  #(Month, month),
+  #(Week, week),
+  #(Day, day),
+  #(Hour, hour),
+  #(Minute, minute),
+  #(Second, second),
+]
+
+fn inner_blur(values: List(#(Int, Unit))) -> #(Int, Unit) {
+  let assert Ok(second) = list.at(values, 0)
+  let leading = list.at(values, 1)
+  use <- bool.guard(result.is_error(leading), second)
+  let [leading] = result.values([leading])
+
+  let assert Ok(leading_unit) = list.key_find(unit_values, leading.1)
+  let assert Ok(second_unit) = list.key_find(unit_values, second.1)
+
+  let leading = case second.0 * second_unit < { leading_unit * 2 / 3 } {
+    True -> leading
+    False -> #(leading.0 + 1, leading.1)
+  }
+
+  case list.drop(values, 2) {
+    [] -> leading
+    chopped -> inner_blur([leading, ..chopped])
+  }
 }
 
 const year_units = ["y", "year", "years"]

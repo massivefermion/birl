@@ -428,32 +428,30 @@ pub fn difference(a: DateTime, b: DateTime) -> duration.Duration {
 }
 
 const units = [
-  #(duration.Year, #("year", "years")),
-  #(duration.Month, #("month", "months")),
-  #(duration.Week, #("week", "weeks")),
-  #(duration.Day, #("day", "days")),
-  #(duration.Hour, #("hour", "hours")),
-  #(duration.Minute, #("minute", "minutes")),
-  #(duration.Second, #("second", "seconds")),
+  #(duration.Year, "year"),
+  #(duration.Month, "month"),
+  #(duration.Week, "week"),
+  #(duration.Day, "day"),
+  #(duration.Hour, "hour"),
+  #(duration.Minute, "minute"),
+  #(duration.Second, "second"),
 ]
 
 pub fn legible_difference(a: DateTime, b: DateTime) -> String {
   case
     difference(a, b)
-    |> duration.decompose
-    |> list.at(0)
+    |> duration.blur
   {
-    Ok(#(_, duration.MicroSecond)) | Ok(#(_, duration.MilliSecond)) | Error(Nil) ->
-      "just now"
+    #(_, duration.MicroSecond) | #(_, duration.MilliSecond) -> "just now"
 
-    Ok(#(amount, unit)) -> {
-      let assert Ok(string_units) = list.key_find(units, unit)
+    #(amount, unit) -> {
+      let assert Ok(unit) = list.key_find(units, unit)
       let is_negative = amount < 0
       let amount = int.absolute_value(amount)
 
       let unit = case amount {
-        1 -> string_units.0
-        _ -> string_units.1
+        1 -> unit
+        _ -> unit <> "s"
       }
 
       case is_negative {
