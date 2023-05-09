@@ -202,6 +202,8 @@ const unit_values = [
   #(Hour, hour),
   #(Minute, minute),
   #(Second, second),
+  #(MilliSecond, milli_second),
+  #(MicroSecond, 1),
 ]
 
 fn inner_blur(values: List(#(Int, Unit))) -> #(Int, Unit) {
