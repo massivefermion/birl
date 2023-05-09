@@ -188,10 +188,16 @@ pub fn accurate_decompose(duration: Duration) -> List(#(Int, Unit)) {
 
 /// approximates the duration by a value in a single unit
 pub fn blur(duration: Duration) -> #(Int, Unit) {
-  duration
-  |> decompose
-  |> list.reverse
-  |> inner_blur
+  case
+    duration
+    |> decompose
+  {
+    [] -> #(0, MicroSecond)
+    decomposed ->
+      decomposed
+      |> list.reverse
+      |> inner_blur
+  }
 }
 
 const unit_values = [
