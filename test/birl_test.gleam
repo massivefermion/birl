@@ -78,6 +78,41 @@ pub fn to_parts_test() {
   |> should.equal(offset)
 }
 
+pub fn get_date_accessor_test() {
+  let date_time =
+    time.from_iso8601(iso_datetime)
+    |> should.be_ok
+
+  let date =
+    date_time
+    |> time.get_date
+
+  date.year
+  |> should.equal(year)
+
+  date.month
+  |> should.equal(month)
+
+  date.day
+  |> should.equal(day)
+
+  let time =
+    date_time
+    |> time.get_time
+
+  time.hour
+  |> should.equal(hour)
+
+  time.minute
+  |> should.equal(minute)
+
+  time.second
+  |> should.equal(second)
+
+  time.milli_second
+  |> should.equal(milli_second)
+}
+
 pub fn from_parts_test() {
   time.unix_epoch
   |> time.set_offset(offset)

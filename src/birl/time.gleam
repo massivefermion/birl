@@ -16,7 +16,7 @@ pub opaque type DateTime {
 }
 
 pub type Date {
-  Date(day: Int, month: Int, year: Int)
+  Date(year: Int, month: Int, day: Int)
 }
 
 pub type Time {
