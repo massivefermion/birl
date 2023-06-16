@@ -186,6 +186,84 @@ pub fn from_iso8601(value: String) -> Result(DateTime, Nil) {
   }
 }
 
+/// the naive format is the same as ISO8601 except that it does not contain the offset
+pub fn to_naive(value: DateTime) -> String {
+  let #(#(year, month, day), #(hour, minute, second, milli_second), _) =
+    to_parts(value)
+
+  int.to_string(year) <> "-" <> {
+    month
+    |> int.to_string
+    |> string.pad_left(2, "0")
+  } <> "-" <> {
+    day
+    |> int.to_string
+    |> string.pad_left(2, "0")
+  } <> "T" <> {
+    hour
+    |> int.to_string
+    |> string.pad_left(2, "0")
+  } <> ":" <> {
+    minute
+    |> int.to_string
+    |> string.pad_left(2, "0")
+  } <> ":" <> {
+    second
+    |> int.to_string
+    |> string.pad_left(2, "0")
+  } <> "." <> {
+    milli_second
+    |> int.to_string
+    |> string.pad_left(3, "0")
+  }
+}
+
+/// the naive format is the same as ISO8601 except that it does not contain the offset
+pub fn from_naive(value: String) -> Result(DateTime, Nil) {
+  let value = string.trim(value)
+
+  let #(date_string, time_string) = case string.split(value, "T") {
+    [date_string] -> #(date_string, "00")
+    [date_string, time_string] -> #(date_string, time_string)
+  }
+
+  let date_string = string.trim(date_string)
+  let time_string = string.trim(time_string)
+
+  let time_string = string.replace(time_string, ":", "")
+  let #(time_string, milli_seconds_result) = case
+    string.split(time_string, ".")
+  {
+    [time_string] -> #(time_string, Ok(0))
+    [time_string, milli_seconds_string] -> #(
+      time_string,
+      int.parse(milli_seconds_string),
+    )
+  }
+
+  case milli_seconds_result {
+    Ok(milli_seconds) -> {
+      use [year, month, day] <- result.then(parse_date(date_string))
+      use [hour, minute, second] <- result.then(parse_time(time_string))
+
+      case
+        from_parts(
+          #(year, month, day),
+          #(hour, minute, second, milli_seconds),
+          "Z",
+        )
+      {
+        Ok(DateTime(timestamp, offset, option.None)) ->
+          Ok(DateTime(timestamp, offset, option.None))
+
+        Error(Nil) -> Error(Nil)
+      }
+    }
+
+    Error(Nil) -> Error(Nil)
+  }
+}
+
 /// see [here](https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/Date)
 pub fn to_http(value: DateTime) -> String {
   let assert Ok(value) = set_offset(value, "Z")
