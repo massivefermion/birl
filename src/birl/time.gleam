@@ -687,48 +687,50 @@ pub fn get_time(value: DateTime) -> Time {
   Time(hour, minute, second, milli_second)
 }
 
-if erlang {
-  /// calculates erlang datetime using the offset in the DateTime value
-  pub fn to_erlang_datetime(
-    value: DateTime,
-  ) -> #(#(Int, Int, Int), #(Int, Int, Int)) {
-    let #(date, #(hour, minute, second, _), _) = to_parts(value)
-    #(date, #(hour, minute, second))
-  }
+@target(erlang)
+/// calculates erlang datetime using the offset in the DateTime value
+pub fn to_erlang_datetime(
+  value: DateTime,
+) -> #(#(Int, Int, Int), #(Int, Int, Int)) {
+  let #(date, #(hour, minute, second, _), _) = to_parts(value)
+  #(date, #(hour, minute, second))
+}
 
-  /// calculates the universal erlang datetime regardless of the offset in the DateTime value
-  pub fn to_erlang_universal_datetime(
-    value: DateTime,
-  ) -> #(#(Int, Int, Int), #(Int, Int, Int)) {
-    let assert Ok(value) = set_offset(value, "Z")
-    let #(date, #(hour, minute, second, _), _) = to_parts(value)
-    #(date, #(hour, minute, second))
-  }
+@target(erlang)
+/// calculates the universal erlang datetime regardless of the offset in the DateTime value
+pub fn to_erlang_universal_datetime(
+  value: DateTime,
+) -> #(#(Int, Int, Int), #(Int, Int, Int)) {
+  let assert Ok(value) = set_offset(value, "Z")
+  let #(date, #(hour, minute, second, _), _) = to_parts(value)
+  #(date, #(hour, minute, second))
+}
 
-  /// calculates the DateTime value from the erlang datetime using the local offset of the system
-  pub fn from_erlang_local_datetime(
-    erlang_datetime: #(#(Int, Int, Int), #(Int, Int, Int)),
-  ) -> DateTime {
-    let #(date, time) = erlang_datetime
-    let offset_in_minutes = ffi_local_offset()
+@target(erlang)
+/// calculates the DateTime value from the erlang datetime using the local offset of the system
+pub fn from_erlang_local_datetime(
+  erlang_datetime: #(#(Int, Int, Int), #(Int, Int, Int)),
+) -> DateTime {
+  let #(date, time) = erlang_datetime
+  let offset_in_minutes = ffi_local_offset()
 
-    let DateTime(wall_time, _, option.None) =
-      unix_epoch
-      |> set_date(Date(date.0, date.1, date.2))
-      |> set_time(Time(time.0, time.1, time.2, 0))
-
-    DateTime(wall_time, offset_in_minutes * 60_000_000, option.None)
-  }
-
-  /// calculates the DateTime value from the erlang datetime in UTC
-  pub fn from_erlang_universal_datetime(
-    erlang_datetime: #(#(Int, Int, Int), #(Int, Int, Int)),
-  ) -> DateTime {
-    let #(date, time) = erlang_datetime
+  let DateTime(wall_time, _, option.None) =
     unix_epoch
     |> set_date(Date(date.0, date.1, date.2))
     |> set_time(Time(time.0, time.1, time.2, 0))
-  }
+
+  DateTime(wall_time, offset_in_minutes * 60_000_000, option.None)
+}
+
+@target(erlang)
+/// calculates the DateTime value from the erlang datetime in UTC
+pub fn from_erlang_universal_datetime(
+  erlang_datetime: #(#(Int, Int, Int), #(Int, Int, Int)),
+) -> DateTime {
+  let #(date, time) = erlang_datetime
+  unix_epoch
+  |> set_date(Date(date.0, date.1, date.2))
+  |> set_time(Time(time.0, time.1, time.2, 0))
 }
 
 fn to_parts(
@@ -929,13 +931,11 @@ fn parse_iso_section(
   }
 }
 
-if erlang {
-  const weekdays = [Mon, Tue, Wed, Thu, Fri, Sat, Sun]
-}
+@target(erlang)
+const weekdays = [Mon, Tue, Wed, Thu, Fri, Sat, Sun]
 
-if javascript {
-  const weekdays = [Sun, Mon, Tue, Wed, Thu, Fri, Sat]
-}
+@target(javascript)
+const weekdays = [Sun, Mon, Tue, Wed, Thu, Fri, Sat]
 
 const months = [Jan, Feb, Mar, Apr, May, Jun, Jul, Aug, Sep, Oct, Nov, Dec]
 
@@ -964,54 +964,26 @@ const month_strings = [
   #(Dec, #("December", "Dec")),
 ]
 
-if erlang {
-  external fn ffi_now() -> Int =
-    "birl_ffi" "now"
+@external(erlang, "birl_ffi", "now")
+@external(javascript, "../birl_ffi.mjs", "now")
+fn ffi_now() -> Int
 
-  external fn ffi_local_offset() -> Int =
-    "birl_ffi" "local_offset"
+@external(erlang, "birl_ffi", "local_offset")
+@external(javascript, "../birl_ffi.mjs", "local_offset")
+fn ffi_local_offset() -> Int
 
-  external fn ffi_monotonic_now() -> Int =
-    "birl_ffi" "monotonic_now"
+@external(erlang, "birl_ffi", "monotonic_now")
+@external(javascript, "../birl_ffi.mjs", "monotonic_now")
+fn ffi_monotonic_now() -> Int
 
-  external fn ffi_to_parts(
-    Int,
-    Int,
-  ) -> #(#(Int, Int, Int), #(Int, Int, Int, Int)) =
-    "birl_ffi" "to_parts"
+@external(erlang, "birl_ffi", "to_parts")
+@external(javascript, "../birl_ffi.mjs", "to_parts")
+fn ffi_to_parts(a: Int, b: Int) -> #(#(Int, Int, Int), #(Int, Int, Int, Int))
 
-  external fn ffi_from_parts(
-    #(#(Int, Int, Int), #(Int, Int, Int, Int)),
-    Int,
-  ) -> Int =
-    "birl_ffi" "from_parts"
+@external(erlang, "birl_ffi", "from_parts")
+@external(javascript, "../birl_ffi.mjs", "from_parts")
+fn ffi_from_parts(a: #(#(Int, Int, Int), #(Int, Int, Int, Int)), b: Int) -> Int
 
-  external fn ffi_weekday(Int, Int) -> Int =
-    "birl_ffi" "weekday"
-}
-
-if javascript {
-  external fn ffi_now() -> Int =
-    "../birl_ffi.mjs" "now"
-
-  external fn ffi_local_offset() -> Int =
-    "../birl_ffi.mjs" "local_offset"
-
-  external fn ffi_monotonic_now() -> Int =
-    "../birl_ffi.mjs" "monotonic_now"
-
-  external fn ffi_to_parts(
-    Int,
-    Int,
-  ) -> #(#(Int, Int, Int), #(Int, Int, Int, Int)) =
-    "../birl_ffi.mjs" "to_parts"
-
-  external fn ffi_from_parts(
-    #(#(Int, Int, Int), #(Int, Int, Int, Int)),
-    Int,
-  ) -> Int =
-    "../birl_ffi.mjs" "from_parts"
-
-  external fn ffi_weekday(Int, Int) -> Int =
-    "../birl_ffi.mjs" "weekday"
-}
+@external(erlang, "birl_ffi", "weekday")
+@external(javascript, "../birl_ffi.mjs", "weekday")
+fn ffi_weekday(a: Int, b: Int) -> Int
