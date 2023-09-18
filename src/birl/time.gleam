@@ -9,10 +9,16 @@ import gleam/option
 import gleam/function
 import gleam/iterator
 import birl/duration
+import birl/zones
 import ranger
 
 pub opaque type DateTime {
-  DateTime(wall_time: Int, offset: Int, monotonic_time: option.Option(Int))
+  DateTime(
+    wall_time: Int,
+    offset: Int,
+    timezone: option.Option(String),
+    monotonic_time: option.Option(Int),
+  )
 }
 
 pub type Date {
@@ -24,7 +30,7 @@ pub type Time {
 }
 
 /// starting point of unix timestamps
-pub const unix_epoch = DateTime(0, 0, option.None)
+pub const unix_epoch = DateTime(0, 0, option.None, option.None)
 
 pub type Weekday {
   Mon
@@ -56,14 +62,34 @@ pub fn now() -> DateTime {
   let now = ffi_now()
   let offset_in_minutes = ffi_local_offset()
   let monotonic_now = ffi_monotonic_now()
-  DateTime(now, offset_in_minutes * 60_000_000, option.Some(monotonic_now))
+  let timezone = local_timezone()
+  case
+    zones.list
+    |> list.key_find(timezone)
+  {
+    Ok(_) ->
+      DateTime(
+        now,
+        offset_in_minutes * 60_000_000,
+        option.Some(timezone),
+        option.Some(monotonic_now),
+      )
+
+    Error(Nil) ->
+      DateTime(
+        now,
+        offset_in_minutes * 60_000_000,
+        option.None,
+        option.Some(monotonic_now),
+      )
+  }
 }
 
 /// use this to get the current time in utc
 pub fn utc_now() -> DateTime {
   let now = ffi_now()
   let monotonic_now = ffi_monotonic_now()
-  DateTime(now, 0, option.Some(monotonic_now))
+  DateTime(now, 0, option.Some("Etc/UTC"), option.Some(monotonic_now))
 }
 
 /// use this to get the current time with a given offset.
@@ -75,8 +101,29 @@ pub fn now_with_offset(offset: String) -> Result(DateTime, Nil) {
   use offset <- result.then(parse_offset(offset))
   let now = ffi_now()
   let monotonic_now = ffi_monotonic_now()
-  DateTime(now, offset, option.Some(monotonic_now))
+  DateTime(now, offset, option.None, option.Some(monotonic_now))
   |> Ok
+}
+
+pub fn now_with_timezone(timezone: String) -> Result(DateTime, Nil) {
+  case
+    zones.list
+    |> list.key_find(timezone)
+  {
+    Ok(offset) -> {
+      let now = ffi_now()
+      let monotonic_now = ffi_monotonic_now()
+      DateTime(
+        now,
+        offset * 1_000_000,
+        option.Some(timezone),
+        option.Some(monotonic_now),
+      )
+      |> Ok
+    }
+
+    Error(Nil) -> Error(Nil)
+  }
 }
 
 pub fn monotonic_now() -> Int {
@@ -175,8 +222,8 @@ pub fn from_iso8601(value: String) -> Result(DateTime, Nil) {
           offset_string,
         )
       {
-        Ok(DateTime(timestamp, offset, option.None)) ->
-          Ok(DateTime(timestamp, offset, option.None))
+        Ok(DateTime(timestamp, offset, option.None, option.None)) ->
+          Ok(DateTime(timestamp, offset, option.None, option.None))
 
         Error(Nil) -> Error(Nil)
       }
@@ -253,8 +300,8 @@ pub fn from_naive(value: String) -> Result(DateTime, Nil) {
           "Z",
         )
       {
-        Ok(DateTime(timestamp, offset, option.None)) ->
-          Ok(DateTime(timestamp, offset, option.None))
+        Ok(DateTime(timestamp, offset, option.None, option.None)) ->
+          Ok(DateTime(timestamp, offset, option.None, option.None))
 
         Error(Nil) -> Error(Nil)
       }
@@ -465,18 +512,18 @@ pub fn from_http(value: String) -> Result(DateTime, Nil) {
 /// unix timestamps are the number of seconds that have elapsed since 00:00:00 UTC on January 1st, 1970
 pub fn to_unix(value: DateTime) -> Int {
   case value {
-    DateTime(t, _, _) -> t / 1_000_000
+    DateTime(t, _, _, _) -> t / 1_000_000
   }
 }
 
 /// unix timestamps are the number of seconds that have elapsed since 00:00:00 UTC on January 1st, 1970
 pub fn from_unix(value: Int) -> DateTime {
-  DateTime(value * 1_000_000, 0, option.None)
+  DateTime(value * 1_000_000, 0, option.None, option.None)
 }
 
 pub fn compare(a: DateTime, b: DateTime) -> order.Order {
-  let DateTime(wall_time: wta, offset: _, monotonic_time: mta) = a
-  let DateTime(wall_time: wtb, offset: _, monotonic_time: mtb) = b
+  let DateTime(wall_time: wta, offset: _, timezone: _, monotonic_time: mta) = a
+  let DateTime(wall_time: wtb, offset: _, timezone: _, monotonic_time: mtb) = b
 
   let #(ta, tb) = case #(mta, mtb) {
     #(option.Some(ta), option.Some(tb)) -> #(ta, tb)
@@ -494,8 +541,8 @@ pub fn compare(a: DateTime, b: DateTime) -> order.Order {
 }
 
 pub fn difference(a: DateTime, b: DateTime) -> duration.Duration {
-  let DateTime(wall_time: wta, offset: _, monotonic_time: mta) = a
-  let DateTime(wall_time: wtb, offset: _, monotonic_time: mtb) = b
+  let DateTime(wall_time: wta, offset: _, timezone: _, monotonic_time: mta) = a
+  let DateTime(wall_time: wtb, offset: _, timezone: _, monotonic_time: mtb) = b
 
   let #(ta, tb) = case #(mta, mtb) {
     #(option.Some(ta), option.Some(tb)) -> #(ta, tb)
@@ -544,38 +591,52 @@ pub fn legible_difference(a: DateTime, b: DateTime) -> String {
 }
 
 pub fn add(value: DateTime, duration: duration.Duration) -> DateTime {
-  let DateTime(wall_time: wt, offset: o, monotonic_time: mt) = value
+  let DateTime(wall_time: wt, offset: o, timezone: timezone, monotonic_time: mt) =
+    value
   let duration.Duration(duration) = duration
   case mt {
     option.Some(mt) ->
       DateTime(
         wall_time: wt + duration,
         offset: o,
+        timezone: timezone,
         monotonic_time: option.Some(mt + duration),
       )
     option.None ->
-      DateTime(wall_time: wt + duration, offset: o, monotonic_time: option.None)
+      DateTime(
+        wall_time: wt + duration,
+        offset: o,
+        timezone: timezone,
+        monotonic_time: option.None,
+      )
   }
 }
 
 pub fn subtract(value: DateTime, duration: duration.Duration) -> DateTime {
-  let DateTime(wall_time: wt, offset: o, monotonic_time: mt) = value
+  let DateTime(wall_time: wt, offset: o, timezone: timezone, monotonic_time: mt) =
+    value
   let duration.Duration(duration) = duration
   case mt {
     option.Some(mt) ->
       DateTime(
         wall_time: wt - duration,
         offset: o,
+        timezone: timezone,
         monotonic_time: option.Some(mt - duration),
       )
     option.None ->
-      DateTime(wall_time: wt - duration, offset: o, monotonic_time: option.None)
+      DateTime(
+        wall_time: wt - duration,
+        offset: o,
+        timezone: timezone,
+        monotonic_time: option.None,
+      )
   }
 }
 
 pub fn weekday(value: DateTime) -> Weekday {
   case value {
-    DateTime(wall_time: t, offset: o, monotonic_time: _) -> {
+    DateTime(wall_time: t, offset: o, timezone: _, monotonic_time: _) -> {
       let assert Ok(weekday) = list.at(weekdays, ffi_weekday(t, o))
       weekday
     }
@@ -642,7 +703,32 @@ pub fn range(
   |> ranger.unwrap
 }
 
-/// use this tp change the offset of a given time value.
+pub fn set_timezone(
+  value: DateTime,
+  new_timezone: String,
+) -> Result(DateTime, Nil) {
+  case
+    zones.list
+    |> list.key_find(new_timezone)
+  {
+    Ok(new_offset_number) -> {
+      case value {
+        DateTime(wall_time: t, offset: _, timezone: _, monotonic_time: mt) ->
+          DateTime(t, new_offset_number, option.Some(new_timezone), mt)
+          |> Ok
+      }
+    }
+
+    Error(Nil) -> Error(Nil)
+  }
+}
+
+pub fn get_timezone(value: DateTime) -> option.Option(String) {
+  let DateTime(_, _, timezone, _) = value
+  timezone
+}
+
+/// use this to change the offset of a given time value.
 ///
 /// Some examples of acceptable offsets:
 ///
@@ -650,14 +736,14 @@ pub fn range(
 pub fn set_offset(value: DateTime, new_offset: String) -> Result(DateTime, Nil) {
   use new_offset_number <- result.then(parse_offset(new_offset))
   case value {
-    DateTime(wall_time: t, offset: _, monotonic_time: mt) ->
-      DateTime(t, new_offset_number, mt)
+    DateTime(wall_time: t, offset: _, timezone: timezone, monotonic_time: mt) ->
+      DateTime(t, new_offset_number, timezone, mt)
       |> Ok
   }
 }
 
 pub fn get_offset(value: DateTime) -> String {
-  let DateTime(_, offset, _) = value
+  let DateTime(_, offset, _, _) = value
   let assert Ok(offset) = generate_offset(offset)
   offset
 }
@@ -714,12 +800,31 @@ pub fn from_erlang_local_datetime(
   let #(date, time) = erlang_datetime
   let offset_in_minutes = ffi_local_offset()
 
-  let DateTime(wall_time, _, option.None) =
+  let DateTime(wall_time, _, option.None, option.None) =
     unix_epoch
     |> set_date(Date(date.0, date.1, date.2))
     |> set_time(Time(time.0, time.1, time.2, 0))
 
-  DateTime(wall_time, offset_in_minutes * 60_000_000, option.None)
+  let timezone = local_timezone()
+  case
+    zones.list
+    |> list.key_find(timezone)
+  {
+    Ok(_) ->
+      DateTime(
+        wall_time,
+        offset_in_minutes * 60_000_000,
+        option.Some(timezone),
+        option.None,
+      )
+    Error(Nil) ->
+      DateTime(
+        wall_time,
+        offset_in_minutes * 60_000_000,
+        option.None,
+        option.None,
+      )
+  }
 }
 
 @target(erlang)
@@ -728,16 +833,19 @@ pub fn from_erlang_universal_datetime(
   erlang_datetime: #(#(Int, Int, Int), #(Int, Int, Int)),
 ) -> DateTime {
   let #(date, time) = erlang_datetime
-  unix_epoch
-  |> set_date(Date(date.0, date.1, date.2))
-  |> set_time(Time(time.0, time.1, time.2, 0))
+  let assert Ok(new_value) =
+    unix_epoch
+    |> set_date(Date(date.0, date.1, date.2))
+    |> set_time(Time(time.0, time.1, time.2, 0))
+    |> set_timezone("Etc/UTC")
+  new_value
 }
 
 fn to_parts(
   value: DateTime,
 ) -> #(#(Int, Int, Int), #(Int, Int, Int, Int), String) {
   case value {
-    DateTime(wall_time: t, offset: o, monotonic_time: _) -> {
+    DateTime(wall_time: t, offset: o, timezone: _, monotonic_time: _) -> {
       let #(date, time) = ffi_to_parts(t, o)
       let assert Ok(offset) = generate_offset(o)
       #(date, time, offset)
@@ -752,7 +860,7 @@ fn from_parts(
 ) -> Result(DateTime, Nil) {
   use offset_number <- result.then(parse_offset(offset))
   ffi_from_parts(#(date, time), offset_number)
-  |> DateTime(offset_number, option.None)
+  |> DateTime(offset_number, option.None, option.None)
   |> Ok
 }
 
@@ -987,3 +1095,7 @@ fn ffi_from_parts(a: #(#(Int, Int, Int), #(Int, Int, Int, Int)), b: Int) -> Int
 @external(erlang, "birl_ffi", "weekday")
 @external(javascript, "../birl_ffi.mjs", "weekday")
 fn ffi_weekday(a: Int, b: Int) -> Int
+
+@external(erlang, "birl_ffi", "local_timezone")
+@external(javascript, "../birl_ffi.mjs", "local_timezone")
+pub fn local_timezone() -> String

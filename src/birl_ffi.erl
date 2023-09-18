@@ -6,7 +6,8 @@
     monotonic_now/0,
     to_parts/2,
     from_parts/2,
-    weekday/2
+    weekday/2,
+    local_timezone/0
 ]).
 
 -define(DaysInMonths, [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31]).
@@ -20,6 +21,15 @@ local_offset() ->
     if
         LD - UD == 0 -> (LH - UH) * 60 + LM - UM;
         true -> (LD - UD) * ((23 - UH) * 60 + (60 - UM) + LH * 60 + LM)
+    end.
+
+local_timezone() ->
+    case os:type() of
+        {unix, _} ->
+            Result = os:cmd("timedatectl | grep 'Time zone' | awk '{print $3}'"),
+            binary:list_to_bin(string:sub_string(Result, 1, length(Result) - 1));
+        {win32, _} ->
+            <<"">>
     end.
 
 monotonic_now() ->
