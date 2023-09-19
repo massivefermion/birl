@@ -881,6 +881,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "thousands"
+version = "0.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "3bf63baf9f5039dadc247375c29eb13706706cfde997d0330d05aa63a77d8820"
+
+[[package]]
 name = "tinyvec"
 version = "1.6.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1218,7 +1224,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "zoneinfo-provider"
+name = "zones-provider"
 version = "0.1.0"
 dependencies = [
  "flate2",
@@ -1226,5 +1232,6 @@ dependencies = [
  "regex",
  "reqwest",
  "tar",
+ "thousands",
  "tokio",
 ]
