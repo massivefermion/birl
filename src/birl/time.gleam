@@ -63,26 +63,25 @@ pub fn now() -> DateTime {
   let offset_in_minutes = ffi_local_offset()
   let monotonic_now = ffi_monotonic_now()
   let timezone = local_timezone()
-  case
-    zones.list
-    |> list.key_find(timezone)
-  {
-    Ok(_) ->
-      DateTime(
-        now,
-        offset_in_minutes * 60_000_000,
-        option.Some(timezone),
-        option.Some(monotonic_now),
-      )
 
-    Error(Nil) ->
-      DateTime(
-        now,
-        offset_in_minutes * 60_000_000,
-        option.None,
-        option.Some(monotonic_now),
-      )
-  }
+  DateTime(
+    now,
+    offset_in_minutes * 60_000_000,
+    option.map(
+      timezone,
+      fn(tz) {
+        case
+          zones.list
+          |> list.any(fn(item) { item.0 == tz })
+        {
+          True -> option.Some(tz)
+          False -> option.None
+        }
+      },
+    )
+    |> option.flatten,
+    option.Some(monotonic_now),
+  )
 }
 
 /// use this to get the current time in utc
@@ -806,25 +805,25 @@ pub fn from_erlang_local_datetime(
     |> set_time(Time(time.0, time.1, time.2, 0))
 
   let timezone = local_timezone()
-  case
-    zones.list
-    |> list.key_find(timezone)
-  {
-    Ok(_) ->
-      DateTime(
-        wall_time,
-        offset_in_minutes * 60_000_000,
-        option.Some(timezone),
-        option.None,
-      )
-    Error(Nil) ->
-      DateTime(
-        wall_time,
-        offset_in_minutes * 60_000_000,
-        option.None,
-        option.None,
-      )
-  }
+
+  DateTime(
+    wall_time,
+    offset_in_minutes * 60_000_000,
+    option.map(
+      timezone,
+      fn(tz) {
+        case
+          zones.list
+          |> list.any(fn(item) { item.0 == tz })
+        {
+          True -> option.Some(tz)
+          False -> option.None
+        }
+      },
+    )
+    |> option.flatten,
+    option.None,
+  )
 }
 
 @target(erlang)
@@ -1098,4 +1097,4 @@ fn ffi_weekday(a: Int, b: Int) -> Int
 
 @external(erlang, "birl_ffi", "local_timezone")
 @external(javascript, "../birl_ffi.mjs", "local_timezone")
-pub fn local_timezone() -> String
+pub fn local_timezone() -> option.Option(String)

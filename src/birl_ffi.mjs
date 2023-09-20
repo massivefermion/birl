@@ -1,3 +1,5 @@
+import { Some } from '../gleam_stdlib/gleam/option.mjs';
+
 export function now() {
   return Date.now() * 1000;
 }
@@ -8,7 +10,7 @@ export function local_offset() {
 }
 
 export function local_timezone() {
-  return Intl.DateTimeFormat().resolvedOptions().timeZone;
+  return new Some(Intl.DateTimeFormat().resolvedOptions().timeZone);
 }
 
 export function monotonic_now() {
