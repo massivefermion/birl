@@ -1102,4 +1102,4 @@ fn ffi_weekday(a: Int, b: Int) -> Int
 
 @external(erlang, "birl_ffi", "local_timezone")
 @external(javascript, "../birl_ffi.mjs", "local_timezone")
-pub fn local_timezone() -> option.Option(String)
+fn local_timezone() -> option.Option(String)
