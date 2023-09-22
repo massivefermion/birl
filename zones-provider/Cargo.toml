@@ -6,10 +6,10 @@ version = "0.1.0"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-flate2 = "1.0.27"
-parse-zoneinfo = "0.3.0"
-regex = "1.9.5"
-reqwest = {version = "0.11", features = ["json"]}
-tar = "0.4.40"
-thousands = "0.2.0"
+flate2 = "1.0"
+parse-zoneinfo = "0.3"
+regex = "1.9"
+reqwest = "0.11"
+tar = "0.4"
+thousands = "0.2"
 tokio = {version = "1", features = ["full"]}
