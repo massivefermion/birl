@@ -46,7 +46,10 @@ local_timezone() ->
         {unix, _} ->
             case os:getenv("TZ") of
                 ":" ++ Path ->
-                    {some, timezone_from_path(Path)};
+                    case timezone_from_path(Path) of
+                        <<>> -> none;
+                        TZ -> {some, TZ}
+                    end;
                 false ->
                     case file:read_file("/etc/timezone") of
                         {ok, NewLinedTimezone} ->
@@ -59,8 +62,11 @@ local_timezone() ->
                                     none
                             end
                     end;
-                TZ ->
-                    {some, binary:list_to_bin(string:trim(TZ))}
+                TZOrPath ->
+                    case timezone_from_path(TZOrPath) of
+                        <<>> -> none;
+                        TZ -> {some, TZ}
+                    end
             end;
         {win32, _} ->
             {ok, RegHandle} = win32reg:open([read]),

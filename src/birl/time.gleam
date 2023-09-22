@@ -713,7 +713,12 @@ pub fn set_timezone(
     Ok(new_offset_number) -> {
       case value {
         DateTime(wall_time: t, offset: _, timezone: _, monotonic_time: mt) ->
-          DateTime(t, new_offset_number, option.Some(new_timezone), mt)
+          DateTime(
+            t,
+            new_offset_number * 1_000_000,
+            option.Some(new_timezone),
+            mt,
+          )
           |> Ok
       }
     }
