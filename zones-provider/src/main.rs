@@ -16,7 +16,9 @@ use thousands::Separable;
 // ignored in this case, however this never happens in the tz database as it
 // stands.
 fn strip_comments(mut line: String) -> String {
-    line.find('#').map(|pos| line.truncate(pos));
+    if let Some(pos) = line.find('#') {
+        line.truncate(pos)
+    }
     line
 }
 
@@ -63,7 +65,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let mut zones: BTreeMap<String, i64> = BTreeMap::new();
     for file in FILES_TO_PARSE {
-        let lines = read_to_string(TZ_DATABASE_PATH.to_owned() + &"/" + &file)
+        let lines = read_to_string(TZ_DATABASE_PATH.to_owned() + "/" + file)
             .unwrap()
             .lines()
             .map(|line| strip_comments(line.to_string()))
@@ -72,7 +74,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         let parser = LineParser::new();
         let mut builder = TableBuilder::new();
         for line in &lines {
-            match parser.parse_str(&line).unwrap() {
+            match parser.parse_str(line).unwrap() {
                 Line::Zone(zone) => builder.add_zone_line(zone).unwrap(),
                 Line::Continuation(cont) => builder.add_continuation_line(cont).unwrap(),
                 Line::Rule(rule) => builder.add_rule_line(rule).unwrap(),
@@ -92,15 +94,15 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     remove_dir_all(TZ_DATABASE_PATH)?;
 
     let mut gleam_map = zones.iter().fold(String::new(), |mut acc, (name, offset)| {
-        acc = acc + "  #(";
+        acc += "  #(";
         acc = acc + "\"" + name + "\"";
-        acc = acc + ", ";
+        acc += ", ";
         if (*offset).abs() > 10_000 {
-            acc = acc + &offset.separate_with_underscores();
+            acc += &offset.separate_with_underscores();
         } else {
-            acc = acc + &offset.to_string();
+            acc += &offset.to_string();
         }
-        acc = acc + "),\n";
+        acc += "),\n";
         acc
     });
 
