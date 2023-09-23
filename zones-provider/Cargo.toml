@@ -11,5 +11,4 @@ parse-zoneinfo = "0.3"
 regex = "1.9"
 reqwest = "0.11"
 tar = "0.4"
-thousands = "0.2"
 tokio = {version = "1", features = ["full"]}

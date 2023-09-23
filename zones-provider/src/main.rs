@@ -9,7 +9,6 @@ use parse_zoneinfo::table::TableBuilder;
 use regex::Regex;
 use reqwest::Client;
 use tar::Archive;
-use thousands::Separable;
 
 // This function is needed until zoneinfo_parse handles comments correctly.
 // Technically a '#' symbol could occur between double quotes and should be
@@ -95,13 +94,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let mut gleam_map = zones.iter().fold(String::new(), |mut acc, (name, offset)| {
         acc += "#(";
-        acc = acc + "\"" + name + "\"";
-        acc += ",";
-        if (*offset).abs() > 10_000 {
-            acc += &offset.separate_with_underscores();
-        } else {
-            acc += &offset.to_string();
-        }
+        acc = acc + "\"" + name + "\",";
+        acc += &offset.to_string();
         acc += "),";
         acc
     });
