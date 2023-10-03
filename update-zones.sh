@@ -1,1 +1,2 @@
-zones-provider/target/release/zones-provider && gleam format src/birl/zones.gleam
+zones-provider/target/release/zones-provider
+gleam format src/birl/zones.gleam
