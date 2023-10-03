@@ -53,7 +53,7 @@ local_timezone() ->
                 false ->
                     case file:read_file("/etc/timezone") of
                         {ok, NewLinedTimezone} ->
-                            {some, binary:list_to_bin(string:trim(NewLinedTimezone))};
+                            {some, string:trim(NewLinedTimezone)};
                         {error, _} ->
                             case file:read_link("/etc/localtime") of
                                 {ok, Path} ->
