@@ -1,7 +1,9 @@
-# birl
+![birl](https://raw.githubusercontent.com/massivefermion/birl/main/logo.jpg)
 
 [![Package Version](https://img.shields.io/hexpm/v/birl)](https://hex.pm/packages/birl)
 [![Hex Docs](https://img.shields.io/badge/hex-docs-ffaff3)](https://hexdocs.pm/birl/)
+
+# birl
 
 Date/Time handling for gleam
 
