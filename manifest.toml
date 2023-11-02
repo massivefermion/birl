@@ -2,12 +2,12 @@
 # You typically do not need to edit this file
 
 packages = [
-  { name = "gleam_stdlib", version = "0.31.0", build_tools = ["gleam"], requirements = [], otp_app = "gleam_stdlib", source = "hex", outer_checksum = "6D1BC5B4D4179B9FEE866B1E69FE180AC2CE485AD90047C0B32B2CA984052736" },
-  { name = "gleeunit", version = "0.11.0", build_tools = ["gleam"], requirements = ["gleam_stdlib"], otp_app = "gleeunit", source = "hex", outer_checksum = "1397E5C4AC4108769EE979939AC39BF7870659C5AFB714630DEEEE16B8272AD5" },
-  { name = "ranger", version = "0.3.0", build_tools = ["gleam"], requirements = ["gleam_stdlib"], otp_app = "ranger", source = "hex", outer_checksum = "A3D54DD2BFCC654F1AA7A0D245F6F59A5D9FF6B2D68449C849BFE321E945EA7A" },
+  { name = "gleam_stdlib", version = "0.32.0", build_tools = ["gleam"], requirements = [], otp_app = "gleam_stdlib", source = "hex", outer_checksum = "07D64C26D014CF570F8ACADCE602761EA2E74C842D26F2FD49B0D61973D9966F" },
+  { name = "gleeunit", version = "1.0.0", build_tools = ["gleam"], requirements = ["gleam_stdlib"], otp_app = "gleeunit", source = "hex", outer_checksum = "D3682ED8C5F9CAE1C928F2506DE91625588CC752495988CBE0F5653A42A6F334" },
+  { name = "ranger", version = "0.5.0", build_tools = ["gleam"], requirements = ["gleam_stdlib"], otp_app = "ranger", source = "hex", outer_checksum = "653A15D0C73E75AD4EC6DE40478F0EBBA1157D0F5BB16FDD454D0C1129C32D41" },
 ]
 
 [requirements]
-gleam_stdlib = { version = "~> 0.31" }
-gleeunit = { version = "~> 0.11" }
-ranger = { version = "~> 0.3" }
+gleam_stdlib = { version = "~> 0.32" }
+gleeunit = { version = "~> 1.0" }
+ranger = { version = "~> 0.5" }
