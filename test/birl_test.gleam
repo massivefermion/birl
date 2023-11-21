@@ -59,7 +59,7 @@ pub fn to_parts_test() {
     |> should.be_ok
 
   time
-  |> birl.get_date
+  |> birl.get_day
   |> should.equal(birl.Day(year, month, date))
 
   time
@@ -77,7 +77,7 @@ pub fn get_date_accessor_test() {
     |> birl.parse
     |> should.be_ok
 
-  let day = birl.get_date(date_time)
+  let day = birl.get_day(date_time)
 
   day.year
   |> should.equal(year)

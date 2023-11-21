@@ -772,7 +772,7 @@ pub fn set_day(value: Time, day: Day) -> Time {
   new_value
 }
 
-pub fn get_date(value: Time) -> Day {
+pub fn get_day(value: Time) -> Day {
   let #(#(year, month, day), _, _) = to_parts(value)
   Day(year, month, day)
 }
