@@ -1,20 +1,19 @@
 import gleam/int
-import gleam/bool
 import gleam/list
+import gleam/bool
 import gleam/order
 import gleam/regex
-import gleam/result
 import gleam/string
 import gleam/option
-import gleam/function
+import gleam/result
 import gleam/iterator
-import birl/duration
+import gleam/function
 import birl/zones
+import birl/duration
 import ranger
 
-@deprecated("Use birl.Time instead!")
-pub opaque type DateTime {
-  DateTime(
+pub opaque type Time {
+  Time(
     wall_time: Int,
     offset: Int,
     timezone: option.Option(String),
@@ -22,20 +21,17 @@ pub opaque type DateTime {
   )
 }
 
-@deprecated("Use birl.Day instead!")
-pub type Date {
-  Date(year: Int, month: Int, day: Int)
+pub type Day {
+  Day(year: Int, month: Int, date: Int)
 }
 
-@deprecated("Use birl.TimeOfDay instead!")
-pub type Time {
-  Time(hour: Int, minute: Int, second: Int, milli_second: Int)
+pub type TimeOfDay {
+  TimeOfDay(hour: Int, minute: Int, second: Int, milli_second: Int)
 }
 
 /// starting point of unix timestamps
-pub const unix_epoch = DateTime(0, 0, option.None, option.None)
+pub const unix_epoch = Time(0, 0, option.None, option.None)
 
-@deprecated("Use birl.Weekday instead!")
 pub type Weekday {
   Mon
   Tue
@@ -46,7 +42,6 @@ pub type Weekday {
   Sun
 }
 
-@deprecated("Use birl.Month instead!")
 pub type Month {
   Jan
   Feb
@@ -63,14 +58,13 @@ pub type Month {
 }
 
 /// use this to get the current time in the local timezone offset
-@deprecated("Use birl.now instead!")
-pub fn now() -> DateTime {
+pub fn now() -> Time {
   let now = ffi_now()
   let offset_in_minutes = ffi_local_offset()
   let monotonic_now = ffi_monotonic_now()
   let timezone = local_timezone()
 
-  DateTime(
+  Time(
     now,
     offset_in_minutes * 60_000_000,
     option.map(
@@ -91,11 +85,10 @@ pub fn now() -> DateTime {
 }
 
 /// Use this to get the current time in utc
-@deprecated("Use birl.utc_now instead!")
-pub fn utc_now() -> DateTime {
+pub fn utc_now() -> Time {
   let now = ffi_now()
   let monotonic_now = ffi_monotonic_now()
-  DateTime(now, 0, option.Some("Etc/UTC"), option.Some(monotonic_now))
+  Time(now, 0, option.Some("Etc/UTC"), option.Some(monotonic_now))
 }
 
 /// Use this to get the current time with a given offset.
@@ -103,17 +96,15 @@ pub fn utc_now() -> DateTime {
 /// Some examples of acceptable offsets:
 ///
 /// `"+330", "03:30", "-8:00","-7", "-0400", "03"`
-@deprecated("Use birl.now_with_offset instead!")
-pub fn now_with_offset(offset: String) -> Result(DateTime, Nil) {
+pub fn now_with_offset(offset: String) -> Result(Time, Nil) {
   use offset <- result.then(parse_offset(offset))
   let now = ffi_now()
   let monotonic_now = ffi_monotonic_now()
-  DateTime(now, offset, option.None, option.Some(monotonic_now))
+  Time(now, offset, option.None, option.Some(monotonic_now))
   |> Ok
 }
 
-@deprecated("Use birl.now_with_timezone instead!")
-pub fn now_with_timezone(timezone: String) -> Result(DateTime, Nil) {
+pub fn now_with_timezone(timezone: String) -> Result(Time, Nil) {
   case
     zones.list
     |> list.key_find(timezone)
@@ -121,7 +112,7 @@ pub fn now_with_timezone(timezone: String) -> Result(DateTime, Nil) {
     Ok(offset) -> {
       let now = ffi_now()
       let monotonic_now = ffi_monotonic_now()
-      DateTime(
+      Time(
         now,
         offset * 1_000_000,
         option.Some(timezone),
@@ -134,13 +125,11 @@ pub fn now_with_timezone(timezone: String) -> Result(DateTime, Nil) {
   }
 }
 
-@deprecated("Use birl.monotonic_now instead!")
 pub fn monotonic_now() -> Int {
   ffi_monotonic_now()
 }
 
-@deprecated("Use birl.to_iso8601 instead!")
-pub fn to_iso8601(value: DateTime) -> String {
+pub fn to_iso8601(value: Time) -> String {
   let #(#(year, month, day), #(hour, minute, second, milli_second), offset) =
     to_parts(value)
 
@@ -171,18 +160,35 @@ pub fn to_iso8601(value: DateTime) -> String {
   } <> offset
 }
 
-@deprecated("Use birl.parse instead!")
-pub fn from_iso8601(value: String) -> Result(DateTime, Nil) {
+/// Supports formats like:
+/// 
+///   - `2019t14-4`
+/// 
+///   - `20190326t1400-4`
+/// 
+///   - `19051222T16:38-3`
+/// 
+///   - `2019-03-26t14:00.9z`
+/// 
+///   - `1905-12-22T163823+0330`
+/// 
+///   - `2019-03-26T14:00:00.9Z`
+/// 
+///   - `2019-03-26T14:00:00,4999Z`
+/// 
+///   - `1905-12-22T16:38:23.000+03:30`
+pub fn parse(value: String) -> Result(Time, Nil) {
   let assert Ok(offset_pattern) = regex.from_string("(.*)([+|\\-].*)")
   let value = string.trim(value)
 
-  let #(date_string, offsetted_time_string) = case string.split(value, "T") {
-    [date_string] -> #(date_string, "00")
-    [date_string, offsetted_time_string] -> #(
-      date_string,
-      offsetted_time_string,
-    )
-  }
+  use #(date_string, offsetted_time_string) <- result.then(case
+    [string.split(value, "T"), string.split(value, "t")]
+  {
+    [[date_string, time_string], _] | [_, [date_string, time_string]] ->
+      Ok(#(date_string, time_string))
+    [[_], [_]] -> Ok(#(value, "00"))
+    _ -> Error(Nil)
+  })
 
   let date_string = string.trim(date_string)
   let offsetted_time_string = string.trim(offsetted_time_string)
@@ -211,33 +217,33 @@ pub fn from_iso8601(value: String) -> Result(DateTime, Nil) {
   }
 
   let time_string = string.replace(time_string, ":", "")
-  let #(time_string, milli_seconds_result) = case
-    string.split(time_string, ".")
+  use #(time_string, milli_seconds_result) <- result.then(case
+    [string.split(time_string, "."), string.split(time_string, ",")]
   {
-    [time_string] -> #(time_string, Ok(0))
-    [time_string, milli_seconds_string] -> #(
-      time_string,
-      int.parse(milli_seconds_string),
-    )
-  }
+    [[_], [_]] -> Ok(#(time_string, Ok(0)))
+    [[time_string, milli_seconds_string], [_]]
+    | [[_], [time_string, milli_seconds_string]] ->
+      Ok(#(
+        time_string,
+        milli_seconds_string
+        |> string.slice(0, 3)
+        |> string.pad_right(3, "0")
+        |> int.parse,
+      ))
+
+    _ -> Error(Nil)
+  })
 
   case milli_seconds_result {
     Ok(milli_seconds) -> {
       use [year, month, day] <- result.then(parse_date(date_string))
       use [hour, minute, second] <- result.then(parse_time(time_string))
 
-      case
-        from_parts(
-          #(year, month, day),
-          #(hour, minute, second, milli_seconds),
-          offset_string,
-        )
-      {
-        Ok(DateTime(timestamp, offset, option.None, option.None)) ->
-          Ok(DateTime(timestamp, offset, option.None, option.None))
-
-        Error(Nil) -> Error(Nil)
-      }
+      from_parts(
+        #(year, month, day),
+        #(hour, minute, second, milli_seconds),
+        offset_string,
+      )
     }
 
     Error(Nil) -> Error(Nil)
@@ -245,8 +251,7 @@ pub fn from_iso8601(value: String) -> Result(DateTime, Nil) {
 }
 
 /// the naive format is the same as ISO8601 except that it does not contain the offset
-@deprecated("Use birl.to_naive instead!")
-pub fn to_naive(value: DateTime) -> String {
+pub fn to_naive(value: Time) -> String {
   let #(#(year, month, day), #(hour, minute, second, milli_second), _) =
     to_parts(value)
 
@@ -277,47 +282,50 @@ pub fn to_naive(value: DateTime) -> String {
   }
 }
 
-/// the naive format is the same as ISO8601 except that it does not contain the offset
-@deprecated("Use birl.from_naive instead!")
-pub fn from_naive(value: String) -> Result(DateTime, Nil) {
+/// Accepts fromats similar to the ones listed for `parse` except that there shoundn't be any offset information
+pub fn from_naive(value: String) -> Result(Time, Nil) {
   let value = string.trim(value)
 
-  let #(date_string, time_string) = case string.split(value, "T") {
-    [date_string] -> #(date_string, "00")
-    [date_string, time_string] -> #(date_string, time_string)
-  }
+  use #(date_string, time_string) <- result.then(case
+    [string.split(value, "T"), string.split(value, "t")]
+  {
+    [[date_string, time_string], [_]] | [[_], [date_string, time_string]] ->
+      Ok(#(date_string, time_string))
+    [[_], [_]] -> Ok(#(value, "00"))
+    _ -> Error(Nil)
+  })
 
   let date_string = string.trim(date_string)
   let time_string = string.trim(time_string)
 
   let time_string = string.replace(time_string, ":", "")
-  let #(time_string, milli_seconds_result) = case
-    string.split(time_string, ".")
+  use #(time_string, milli_seconds_result) <- result.then(case
+    [string.split(time_string, "."), string.split(time_string, ",")]
   {
-    [time_string] -> #(time_string, Ok(0))
-    [time_string, milli_seconds_string] -> #(
-      time_string,
-      int.parse(milli_seconds_string),
-    )
-  }
+    [[_], [_]] -> Ok(#(time_string, Ok(0)))
+    [[time_string, milli_seconds_string], [_]]
+    | [[_], [time_string, milli_seconds_string]] ->
+      Ok(#(
+        time_string,
+        milli_seconds_string
+        |> string.slice(0, 3)
+        |> string.pad_right(3, "0")
+        |> int.parse,
+      ))
+
+    _ -> Error(Nil)
+  })
 
   case milli_seconds_result {
     Ok(milli_seconds) -> {
       use [year, month, day] <- result.then(parse_date(date_string))
       use [hour, minute, second] <- result.then(parse_time(time_string))
 
-      case
-        from_parts(
-          #(year, month, day),
-          #(hour, minute, second, milli_seconds),
-          "Z",
-        )
-      {
-        Ok(DateTime(timestamp, offset, option.None, option.None)) ->
-          Ok(DateTime(timestamp, offset, option.None, option.None))
-
-        Error(Nil) -> Error(Nil)
-      }
+      from_parts(
+        #(year, month, day),
+        #(hour, minute, second, milli_seconds),
+        "Z",
+      )
     }
 
     Error(Nil) -> Error(Nil)
@@ -325,8 +333,7 @@ pub fn from_naive(value: String) -> Result(DateTime, Nil) {
 }
 
 /// see [here](https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/Date)
-@deprecated("Use birl.to_http instead!")
-pub fn to_http(value: DateTime) -> String {
+pub fn to_http(value: Time) -> String {
   let assert Ok(value) = set_offset(value, "Z")
   let #(#(year, _, day), #(hour, minute, second, _), _) = to_parts(value)
   let short_weekday = short_string_weekday(value)
@@ -352,8 +359,7 @@ pub fn to_http(value: DateTime) -> String {
 }
 
 /// like `to_http` but assumes the offset in the DateTime value instead of `GMT`
-@deprecated("Use birl.to_http_with_offset instead!")
-pub fn to_http_with_offset(value: DateTime) -> String {
+pub fn to_http_with_offset(value: Time) -> String {
   let #(#(year, _, day), #(hour, minute, second, _), offset) = to_parts(value)
   let short_weekday = short_string_weekday(value)
   let short_month = short_string_month(value)
@@ -395,8 +401,7 @@ pub fn to_http_with_offset(value: DateTime) -> String {
 ///   - `Tuesday, 01-Nov-2016 08:49:37 +330`
 ///
 ///   - `Tuesday, 01 November 2016 08:49:37 +06:30`
-@deprecated("Use birl.from_http instead!")
-pub fn from_http(value: String) -> Result(DateTime, Nil) {
+pub fn from_http(value: String) -> Result(Time, Nil) {
   let value = string.trim(value)
   let [weekday, rest] = string.split(value, ",")
 
@@ -526,23 +531,20 @@ pub fn from_http(value: String) -> Result(DateTime, Nil) {
 }
 
 /// unix timestamps are the number of seconds that have elapsed since 00:00:00 UTC on January 1st, 1970
-@deprecated("Use birl.to_unix instead!")
-pub fn to_unix(value: DateTime) -> Int {
+pub fn to_unix(value: Time) -> Int {
   case value {
-    DateTime(t, _, _, _) -> t / 1_000_000
+    Time(t, _, _, _) -> t / 1_000_000
   }
 }
 
 /// unix timestamps are the number of seconds that have elapsed since 00:00:00 UTC on January 1st, 1970
-@deprecated("Use birl.from_unix instead!")
-pub fn from_unix(value: Int) -> DateTime {
-  DateTime(value * 1_000_000, 0, option.None, option.None)
+pub fn from_unix(value: Int) -> Time {
+  Time(value * 1_000_000, 0, option.None, option.None)
 }
 
-@deprecated("Use birl.compare instead!")
-pub fn compare(a: DateTime, b: DateTime) -> order.Order {
-  let DateTime(wall_time: wta, offset: _, timezone: _, monotonic_time: mta) = a
-  let DateTime(wall_time: wtb, offset: _, timezone: _, monotonic_time: mtb) = b
+pub fn compare(a: Time, b: Time) -> order.Order {
+  let Time(wall_time: wta, offset: _, timezone: _, monotonic_time: mta) = a
+  let Time(wall_time: wtb, offset: _, timezone: _, monotonic_time: mtb) = b
 
   let #(ta, tb) = case #(mta, mtb) {
     #(option.Some(ta), option.Some(tb)) -> #(ta, tb)
@@ -559,10 +561,9 @@ pub fn compare(a: DateTime, b: DateTime) -> order.Order {
   }
 }
 
-@deprecated("Use birl.difference instead!")
-pub fn difference(a: DateTime, b: DateTime) -> duration.Duration {
-  let DateTime(wall_time: wta, offset: _, timezone: _, monotonic_time: mta) = a
-  let DateTime(wall_time: wtb, offset: _, timezone: _, monotonic_time: mtb) = b
+pub fn difference(a: Time, b: Time) -> duration.Duration {
+  let Time(wall_time: wta, offset: _, timezone: _, monotonic_time: mta) = a
+  let Time(wall_time: wtb, offset: _, timezone: _, monotonic_time: mtb) = b
 
   let #(ta, tb) = case #(mta, mtb) {
     #(option.Some(ta), option.Some(tb)) -> #(ta, tb)
@@ -582,8 +583,7 @@ const units = [
   #(duration.Second, "second"),
 ]
 
-@deprecated("Use birl.legible_difference instead!")
-pub fn legible_difference(a: DateTime, b: DateTime) -> String {
+pub fn legible_difference(a: Time, b: Time) -> String {
   case
     difference(a, b)
     |> duration.blur
@@ -611,21 +611,20 @@ pub fn legible_difference(a: DateTime, b: DateTime) -> String {
   }
 }
 
-@deprecated("Use birl.add instead!")
-pub fn add(value: DateTime, duration: duration.Duration) -> DateTime {
-  let DateTime(wall_time: wt, offset: o, timezone: timezone, monotonic_time: mt) =
+pub fn add(value: Time, duration: duration.Duration) -> Time {
+  let Time(wall_time: wt, offset: o, timezone: timezone, monotonic_time: mt) =
     value
   let duration.Duration(duration) = duration
   case mt {
     option.Some(mt) ->
-      DateTime(
+      Time(
         wall_time: wt + duration,
         offset: o,
         timezone: timezone,
         monotonic_time: option.Some(mt + duration),
       )
     option.None ->
-      DateTime(
+      Time(
         wall_time: wt + duration,
         offset: o,
         timezone: timezone,
@@ -634,21 +633,20 @@ pub fn add(value: DateTime, duration: duration.Duration) -> DateTime {
   }
 }
 
-@deprecated("Use birl.subtract instead!")
-pub fn subtract(value: DateTime, duration: duration.Duration) -> DateTime {
-  let DateTime(wall_time: wt, offset: o, timezone: timezone, monotonic_time: mt) =
+pub fn subtract(value: Time, duration: duration.Duration) -> Time {
+  let Time(wall_time: wt, offset: o, timezone: timezone, monotonic_time: mt) =
     value
   let duration.Duration(duration) = duration
   case mt {
     option.Some(mt) ->
-      DateTime(
+      Time(
         wall_time: wt - duration,
         offset: o,
         timezone: timezone,
         monotonic_time: option.Some(mt - duration),
       )
     option.None ->
-      DateTime(
+      Time(
         wall_time: wt - duration,
         offset: o,
         timezone: timezone,
@@ -657,46 +655,40 @@ pub fn subtract(value: DateTime, duration: duration.Duration) -> DateTime {
   }
 }
 
-@deprecated("Use birl.weekday instead!")
-pub fn weekday(value: DateTime) -> Weekday {
+pub fn weekday(value: Time) -> Weekday {
   case value {
-    DateTime(wall_time: t, offset: o, timezone: _, monotonic_time: _) -> {
+    Time(wall_time: t, offset: o, timezone: _, monotonic_time: _) -> {
       let assert Ok(weekday) = list.at(weekdays, ffi_weekday(t, o))
       weekday
     }
   }
 }
 
-@deprecated("Use birl.string_weekday instead!")
-pub fn string_weekday(value: DateTime) -> String {
+pub fn string_weekday(value: Time) -> String {
   let weekday = weekday(value)
   let assert Ok(#(weekday, _)) = list.key_find(weekday_strings, weekday)
   weekday
 }
 
-@deprecated("Use birl.short_string_weekday instead!")
-pub fn short_string_weekday(value: DateTime) -> String {
+pub fn short_string_weekday(value: Time) -> String {
   let weekday = weekday(value)
   let assert Ok(#(_, weekday)) = list.key_find(weekday_strings, weekday)
   weekday
 }
 
-@deprecated("Use birl.month instead!")
-pub fn month(value: DateTime) -> Month {
+pub fn month(value: Time) -> Month {
   let #(#(_, month, _), _, _) = to_parts(value)
   let assert Ok(month) = list.at(months, month - 1)
   month
 }
 
-@deprecated("Use birl.string_month instead!")
-pub fn string_month(value: DateTime) -> String {
+pub fn string_month(value: Time) -> String {
   let month = month(value)
   let assert Ok(#(month, _)) = list.key_find(month_strings, month)
   month
 }
 
-@deprecated("Use birl.short_string_month instead!")
-pub fn short_string_month(value: DateTime) -> String {
+pub fn short_string_month(value: Time) -> String {
   let month = month(value)
   let assert Ok(#(_, month)) = list.key_find(month_strings, month)
   month
@@ -705,12 +697,11 @@ pub fn short_string_month(value: DateTime) -> String {
 /// can be used to create a time range starting from time `a` with step `s`
 ///
 /// if `b` is `option.None` the range will be infinite
-@deprecated("Use birl.range instead!")
 pub fn range(
-  from a: DateTime,
-  to b: option.Option(DateTime),
+  from a: Time,
+  to b: option.Option(Time),
   step s: duration.Duration,
-) -> iterator.Iterator(DateTime) {
+) -> iterator.Iterator(Time) {
   let assert Ok(range) = case b {
     option.Some(b) ->
       ranger.create(
@@ -732,24 +723,15 @@ pub fn range(
   range
 }
 
-@deprecated("Use birl.set_timezone instead!")
-pub fn set_timezone(
-  value: DateTime,
-  new_timezone: String,
-) -> Result(DateTime, Nil) {
+pub fn set_timezone(value: Time, new_timezone: String) -> Result(Time, Nil) {
   case
     zones.list
     |> list.key_find(new_timezone)
   {
     Ok(new_offset_number) -> {
       case value {
-        DateTime(wall_time: t, offset: _, timezone: _, monotonic_time: mt) ->
-          DateTime(
-            t,
-            new_offset_number * 1_000_000,
-            option.Some(new_timezone),
-            mt,
-          )
+        Time(wall_time: t, offset: _, timezone: _, monotonic_time: mt) ->
+          Time(t, new_offset_number * 1_000_000, option.Some(new_timezone), mt)
           |> Ok
       }
     }
@@ -758,9 +740,8 @@ pub fn set_timezone(
   }
 }
 
-@deprecated("Use birl.get_timezone instead!")
-pub fn get_timezone(value: DateTime) -> option.Option(String) {
-  let DateTime(_, _, timezone, _) = value
+pub fn get_timezone(value: Time) -> option.Option(String) {
+  let Time(_, _, timezone, _) = value
   timezone
 }
 
@@ -769,67 +750,57 @@ pub fn get_timezone(value: DateTime) -> option.Option(String) {
 /// Some examples of acceptable offsets:
 ///
 /// `"+330", "03:30", "-8:00","-7", "-0400", "03", "Z"`
-@deprecated("Use birl.set_offset instead!")
-pub fn set_offset(value: DateTime, new_offset: String) -> Result(DateTime, Nil) {
+pub fn set_offset(value: Time, new_offset: String) -> Result(Time, Nil) {
   use new_offset_number <- result.then(parse_offset(new_offset))
   case value {
-    DateTime(wall_time: t, offset: _, timezone: timezone, monotonic_time: mt) ->
-      DateTime(t, new_offset_number, timezone, mt)
+    Time(wall_time: t, offset: _, timezone: timezone, monotonic_time: mt) ->
+      Time(t, new_offset_number, timezone, mt)
       |> Ok
   }
 }
 
-@deprecated("Use birl.get_offset instead!")
-pub fn get_offset(value: DateTime) -> String {
-  let DateTime(_, offset, _, _) = value
+pub fn get_offset(value: Time) -> String {
+  let Time(_, offset, _, _) = value
   let assert Ok(offset) = generate_offset(offset)
   offset
 }
 
-@deprecated("Use birl.set_date instead!")
-pub fn set_date(value: DateTime, date: Date) -> DateTime {
+pub fn set_day(value: Time, day: Day) -> Time {
   let #(_, time, offset) = to_parts(value)
-  let Date(year, month, day) = date
-  let assert Ok(new_value) = from_parts(#(year, month, day), time, offset)
+  let Day(year, month, date) = day
+  let assert Ok(new_value) = from_parts(#(year, month, date), time, offset)
   new_value
 }
 
-@deprecated("Use birl.get_date instead!")
-pub fn get_date(value: DateTime) -> Date {
+pub fn get_date(value: Time) -> Day {
   let #(#(year, month, day), _, _) = to_parts(value)
-  Date(year, month, day)
+  Day(year, month, day)
 }
 
-@deprecated("Use birl.set_time_of_day instead!")
-pub fn set_time(value: DateTime, time: Time) -> DateTime {
+pub fn set_time_of_day(value: Time, time: TimeOfDay) -> Time {
   let #(date, _, offset) = to_parts(value)
-  let Time(hour, minute, second, milli_second) = time
+  let TimeOfDay(hour, minute, second, milli_second) = time
   let assert Ok(new_value) =
     from_parts(date, #(hour, minute, second, milli_second), offset)
   new_value
 }
 
-@deprecated("Use birl.get_time_of_day instead!")
-pub fn get_time(value: DateTime) -> Time {
+pub fn get_time_of_day(value: Time) -> TimeOfDay {
   let #(_, #(hour, minute, second, milli_second), _) = to_parts(value)
-  Time(hour, minute, second, milli_second)
+  TimeOfDay(hour, minute, second, milli_second)
 }
 
 @target(erlang)
 /// calculates erlang datetime using the offset in the DateTime value
-@deprecated("Use birl.to_erlang_time instead!")
-pub fn to_erlang_datetime(
-  value: DateTime,
-) -> #(#(Int, Int, Int), #(Int, Int, Int)) {
+pub fn to_erlang_datetime(value: Time) -> #(#(Int, Int, Int), #(Int, Int, Int)) {
   let #(date, #(hour, minute, second, _), _) = to_parts(value)
   #(date, #(hour, minute, second))
 }
 
 @target(erlang)
 /// calculates the universal erlang datetime regardless of the offset in the DateTime value
-@deprecated("Use birl.to_erlang_universal_time instead!")
 pub fn to_erlang_universal_datetime(
-  value: DateTime,
+  value: Time,
 ) -> #(#(Int, Int, Int), #(Int, Int, Int)) {
   let assert Ok(value) = set_offset(value, "Z")
   let #(date, #(hour, minute, second, _), _) = to_parts(value)
@@ -838,21 +809,20 @@ pub fn to_erlang_universal_datetime(
 
 @target(erlang)
 /// calculates the DateTime value from the erlang datetime using the local offset of the system
-@deprecated("Use birl.from_erlang_local_time instead!")
 pub fn from_erlang_local_datetime(
   erlang_datetime: #(#(Int, Int, Int), #(Int, Int, Int)),
-) -> DateTime {
+) -> Time {
   let #(date, time) = erlang_datetime
   let offset_in_minutes = ffi_local_offset()
 
-  let DateTime(wall_time, _, option.None, option.None) =
+  let Time(wall_time, _, option.None, option.None) =
     unix_epoch
-    |> set_date(Date(date.0, date.1, date.2))
-    |> set_time(Time(time.0, time.1, time.2, 0))
+    |> set_day(Day(date.0, date.1, date.2))
+    |> set_time_of_day(TimeOfDay(time.0, time.1, time.2, 0))
 
   let timezone = local_timezone()
 
-  DateTime(
+  Time(
     wall_time,
     offset_in_minutes * 60_000_000,
     option.map(
@@ -874,40 +844,37 @@ pub fn from_erlang_local_datetime(
 
 @target(erlang)
 /// calculates the DateTime value from the erlang datetime in UTC
-@deprecated("Use birl.from_erlang_universal_time instead!")
 pub fn from_erlang_universal_datetime(
   erlang_datetime: #(#(Int, Int, Int), #(Int, Int, Int)),
-) -> DateTime {
+) -> Time {
   let #(date, time) = erlang_datetime
   let assert Ok(new_value) =
     unix_epoch
-    |> set_date(Date(date.0, date.1, date.2))
-    |> set_time(Time(time.0, time.1, time.2, 0))
+    |> set_day(Day(date.0, date.1, date.2))
+    |> set_time_of_day(TimeOfDay(time.0, time.1, time.2, 0))
     |> set_timezone("Etc/UTC")
   new_value
-}
-
-fn to_parts(
-  value: DateTime,
-) -> #(#(Int, Int, Int), #(Int, Int, Int, Int), String) {
-  case value {
-    DateTime(wall_time: t, offset: o, timezone: _, monotonic_time: _) -> {
-      let #(date, time) = ffi_to_parts(t, o)
-      let assert Ok(offset) = generate_offset(o)
-      #(date, time, offset)
-    }
-  }
 }
 
 fn from_parts(
   date: #(Int, Int, Int),
   time: #(Int, Int, Int, Int),
   offset: String,
-) -> Result(DateTime, Nil) {
+) -> Result(Time, Nil) {
   use offset_number <- result.then(parse_offset(offset))
   ffi_from_parts(#(date, time), offset_number)
-  |> DateTime(offset_number, option.None, option.None)
+  |> Time(offset_number, option.None, option.None)
   |> Ok
+}
+
+fn to_parts(value: Time) -> #(#(Int, Int, Int), #(Int, Int, Int, Int), String) {
+  case value {
+    Time(wall_time: t, offset: o, timezone: _, monotonic_time: _) -> {
+      let #(date, time) = ffi_to_parts(t, o)
+      let assert Ok(offset) = generate_offset(o)
+      #(date, time, offset)
+    }
+  }
 }
 
 fn parse_offset(offset: String) -> Result(Int, Nil) {
@@ -1015,28 +982,40 @@ fn generate_offset(offset: Int) -> Result(String, Nil) {
 }
 
 fn parse_date(date: String) -> Result(List(Int), Nil) {
-  let assert Ok(dash_pattern) =
-    regex.from_string(
-      "(\\d{4})(?:-(1[0-2]|0?[0-9]))?(?:-(3[0-1]|[1-2][0-9]|0?[0-9]))?",
-    )
+  use <- bool.guard(is_invalid_date(date), Error(Nil))
 
-  case regex.scan(dash_pattern, date) {
-    [regex.Match(_, [option.Some(major)])] -> [int.parse(major), Ok(1), Ok(1)]
+  case string.contains(date, "-") {
+    True -> {
+      let assert Ok(dash_pattern) =
+        regex.from_string(
+          "(\\d{4})(?:-(1[0-2]|0?[0-9]))?(?:-(3[0-1]|[1-2][0-9]|0?[0-9]))?",
+        )
 
-    [regex.Match(_, [option.Some(major), option.Some(middle)])] -> [
-      int.parse(major),
-      int.parse(middle),
-      Ok(1),
-    ]
+      case regex.scan(dash_pattern, date) {
+        [regex.Match(_, [option.Some(major)])] -> [
+          int.parse(major),
+          Ok(1),
+          Ok(1),
+        ]
 
-    [
-      regex.Match(
-        _,
-        [option.Some(major), option.Some(middle), option.Some(minor)],
-      ),
-    ] -> [int.parse(major), int.parse(middle), int.parse(minor)]
+        [regex.Match(_, [option.Some(major), option.Some(middle)])] -> [
+          int.parse(major),
+          int.parse(middle),
+          Ok(1),
+        ]
 
-    _ ->
+        [
+          regex.Match(
+            _,
+            [option.Some(major), option.Some(middle), option.Some(minor)],
+          ),
+        ] -> [int.parse(major), int.parse(middle), int.parse(minor)]
+
+        _ -> [Error(Nil)]
+      }
+    }
+
+    False ->
       parse_iso_section(
         date,
         "(\\d{4})(1[0-2]|0?[0-9])?(3[0-1]|[1-2][0-9]|0?[0-9])?",
@@ -1047,12 +1026,39 @@ fn parse_date(date: String) -> Result(List(Int), Nil) {
 }
 
 fn parse_time(time: String) -> Result(List(Int), Nil) {
+  use <- bool.guard(is_invalid_time(time), Error(Nil))
+
   parse_iso_section(
     time,
     "(2[0-3]|1[0-9]|0?[0-9])([1-5][0-9]|0?[0-9])?([1-5][0-9]|0?[0-9])?",
     0,
   )
   |> list.try_map(function.identity)
+}
+
+fn is_invalid_date(date: String) -> Bool {
+  date
+  |> string.to_utf_codepoints
+  |> list.map(string.utf_codepoint_to_int)
+  |> list.any(fn(code) {
+    case code {
+      _ if code == 45 -> False
+      _ if code >= 48 && code <= 57 -> False
+      _ -> True
+    }
+  })
+}
+
+fn is_invalid_time(time: String) -> Bool {
+  time
+  |> string.to_utf_codepoints
+  |> list.map(string.utf_codepoint_to_int)
+  |> list.any(fn(code) {
+    case code {
+      _ if code >= 48 && code <= 58 -> False
+      _ -> True
+    }
+  })
 }
 
 fn parse_iso_section(
@@ -1119,29 +1125,29 @@ const month_strings = [
 ]
 
 @external(erlang, "birl_ffi", "now")
-@external(javascript, "../birl_ffi.mjs", "now")
+@external(javascript, "./birl_ffi.mjs", "now")
 fn ffi_now() -> Int
 
 @external(erlang, "birl_ffi", "local_offset")
-@external(javascript, "../birl_ffi.mjs", "local_offset")
+@external(javascript, "./birl_ffi.mjs", "local_offset")
 fn ffi_local_offset() -> Int
 
 @external(erlang, "birl_ffi", "monotonic_now")
-@external(javascript, "../birl_ffi.mjs", "monotonic_now")
+@external(javascript, "./birl_ffi.mjs", "monotonic_now")
 fn ffi_monotonic_now() -> Int
 
 @external(erlang, "birl_ffi", "to_parts")
-@external(javascript, "../birl_ffi.mjs", "to_parts")
+@external(javascript, "./birl_ffi.mjs", "to_parts")
 fn ffi_to_parts(a: Int, b: Int) -> #(#(Int, Int, Int), #(Int, Int, Int, Int))
 
 @external(erlang, "birl_ffi", "from_parts")
-@external(javascript, "../birl_ffi.mjs", "from_parts")
+@external(javascript, "./birl_ffi.mjs", "from_parts")
 fn ffi_from_parts(a: #(#(Int, Int, Int), #(Int, Int, Int, Int)), b: Int) -> Int
 
 @external(erlang, "birl_ffi", "weekday")
-@external(javascript, "../birl_ffi.mjs", "weekday")
+@external(javascript, "./birl_ffi.mjs", "weekday")
 fn ffi_weekday(a: Int, b: Int) -> Int
 
 @external(erlang, "birl_ffi", "local_timezone")
-@external(javascript, "../birl_ffi.mjs", "local_timezone")
+@external(javascript, "./birl_ffi.mjs", "local_timezone")
 fn local_timezone() -> option.Option(String)
