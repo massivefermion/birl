@@ -4,7 +4,7 @@
 packages = [
   { name = "gleam_stdlib", version = "0.32.1", build_tools = ["gleam"], requirements = [], otp_app = "gleam_stdlib", source = "hex", outer_checksum = "ABF00CDCCB66FABBCE351A50060964C4ACE798F95A0D78622C8A7DC838792577" },
   { name = "gleeunit", version = "1.0.0", build_tools = ["gleam"], requirements = ["gleam_stdlib"], otp_app = "gleeunit", source = "hex", outer_checksum = "D3682ED8C5F9CAE1C928F2506DE91625588CC752495988CBE0F5653A42A6F334" },
-  { name = "ranger", version = "1.0.0", build_tools = ["gleam"], requirements = ["gleam_stdlib"], otp_app = "ranger", source = "hex", outer_checksum = "F405D2BE4D6A381F68983DAA750EF1A97410BFF822B93C058B6072CFE840B35D" },
+  { name = "ranger", version = "1.0.1", build_tools = ["gleam"], requirements = ["gleam_stdlib"], otp_app = "ranger", source = "hex", outer_checksum = "E59E7358339516DA1A2C764363A576D8FA21C6D8004C437960995E62A2EEC10A" },
 ]
 
 [requirements]

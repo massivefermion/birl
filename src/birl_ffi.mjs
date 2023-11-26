@@ -6,7 +6,7 @@ export function now() {
 
 export function local_offset() {
   const date = new Date();
-  return -1 * date.getTimezoneOffset();
+  return -date.getTimezoneOffset();
 }
 
 export function local_timezone() {

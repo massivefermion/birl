@@ -1,5 +1,5 @@
 name = "birl"
-version = "0.18.0"
+version = "1.0.0"
 
 description = "Date / Time handling for Gleam"
 licences = ["Apache-2.0"]
