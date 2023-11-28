@@ -573,7 +573,59 @@ pub fn difference(a: Time, b: Time) -> duration.Duration {
   duration.Duration(ta - tb)
 }
 
-const units = [
+const string_to_units = [
+  #("year", duration.Year),
+  #("month", duration.Month),
+  #("week", duration.Week),
+  #("day", duration.Day),
+  #("hour", duration.Hour),
+  #("minute", duration.Minute),
+  #("second", duration.Second),
+]
+
+/// you could say this is the opposite of `legible_difference`
+/// 
+/// ```gleam
+/// > parse_relative(birl.now(), "8 minutes ago")
+/// ```
+pub fn parse_relative(origin: Time, legible_difference: String) {
+  case string.split(legible_difference, " ") {
+    ["in", amount_string, unit]
+    | [amount_string, unit, "from now"]
+    | [amount_string, unit, "later"]
+    | [amount_string, unit, "ahead"]
+    | [amount_string, unit, "in the future"]
+    | [amount_string, unit, "hence"] -> {
+      let unit = case string.ends_with(unit, "s") {
+        False -> unit
+        True -> string.drop_right(unit, 1)
+      }
+
+      use amount <- result.then(int.parse(amount_string))
+      use unit <- result.then(list.key_find(string_to_units, unit))
+      Ok(add(origin, duration.new([#(amount, unit)])))
+    }
+
+    [amount_string, unit, "ago"]
+    | [amount_string, unit, "before"]
+    | [amount_string, unit, "earlier"]
+    | [amount_string, unit, "since"]
+    | [amount_string, unit, "in the past"] -> {
+      let unit = case string.ends_with(unit, "s") {
+        False -> unit
+        True -> string.drop_right(unit, 1)
+      }
+
+      use amount <- result.then(int.parse(amount_string))
+      use unit <- result.then(list.key_find(string_to_units, unit))
+      Ok(subtract(origin, duration.new([#(amount, unit)])))
+    }
+
+    _ -> Error(Nil)
+  }
+}
+
+const units_to_string = [
   #(duration.Year, "year"),
   #(duration.Month, "month"),
   #(duration.Week, "week"),
@@ -591,7 +643,7 @@ pub fn legible_difference(a: Time, b: Time) -> String {
     #(_, duration.MicroSecond) | #(_, duration.MilliSecond) -> "just now"
 
     #(amount, unit) -> {
-      let assert Ok(unit) = list.key_find(units, unit)
+      let assert Ok(unit) = list.key_find(units_to_string, unit)
       let is_negative = amount < 0
       let amount = int.absolute_value(amount)
 
