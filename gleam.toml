@@ -1,19 +1,16 @@
 name = "birl"
-version = "1.1.0"
+version = "1.2.0"
 
 description = "Date / Time handling for Gleam"
-licences = ["Apache-2.0"]
-links = [{title = "Gleam", href = "https://gleam.run"}]
-repository = {type = "github", user = "massivefermion", repo = "birl"}
-
 gleam = ">= 0.32.0"
-internal_modules = [
-  "birl/zones",
-]
+internal_modules = ["birl/zones"]
+licences = ["Apache-2.0"]
+repository = { type = "github", user = "massivefermion", repo = "birl" }
+links = [{ title = "Gleam", href = "https://gleam.run" }]
 
 [dependencies]
-gleam_stdlib = "~> 0.32"
-ranger = "~> 1.0"
+gleam_stdlib = "~> 0.34"
+ranger = "~> 1.1"
 
 [dev-dependencies]
 gleeunit = "~> 1.0"

@@ -66,19 +66,17 @@ pub fn now() -> Time {
 
   Time(
     now,
-    offset_in_minutes * 60_000_000,
-    option.map(
-      timezone,
-      fn(tz) {
-        case
-          zones.list
-          |> list.any(fn(item) { item.0 == tz })
-        {
-          True -> option.Some(tz)
-          False -> option.None
-        }
-      },
-    )
+    offset_in_minutes
+    * 60_000_000,
+    option.map(timezone, fn(tz) {
+      case
+        zones.list
+        |> list.any(fn(item) { item.0 == tz })
+      {
+        True -> option.Some(tz)
+        False -> option.None
+      }
+    })
     |> option.flatten,
     option.Some(monotonic_now),
   )
@@ -114,7 +112,8 @@ pub fn now_with_timezone(timezone: String) -> Result(Time, Nil) {
       let monotonic_now = ffi_monotonic_now()
       Time(
         now,
-        offset * 1_000_000,
+        offset
+        * 1_000_000,
         option.Some(timezone),
         option.Some(monotonic_now),
       )
@@ -133,31 +132,44 @@ pub fn to_iso8601(value: Time) -> String {
   let #(#(year, month, day), #(hour, minute, second, milli_second), offset) =
     to_parts(value)
 
-  int.to_string(year) <> "-" <> {
+  int.to_string(year)
+  <> "-"
+  <> {
     month
     |> int.to_string
     |> string.pad_left(2, "0")
-  } <> "-" <> {
+  }
+  <> "-"
+  <> {
     day
     |> int.to_string
     |> string.pad_left(2, "0")
-  } <> "T" <> {
+  }
+  <> "T"
+  <> {
     hour
     |> int.to_string
     |> string.pad_left(2, "0")
-  } <> ":" <> {
+  }
+  <> ":"
+  <> {
     minute
     |> int.to_string
     |> string.pad_left(2, "0")
-  } <> ":" <> {
+  }
+  <> ":"
+  <> {
     second
     |> int.to_string
     |> string.pad_left(2, "0")
-  } <> "." <> {
+  }
+  <> "."
+  <> {
     milli_second
     |> int.to_string
     |> string.pad_left(3, "0")
-  } <> offset
+  }
+  <> offset
 }
 
 /// Supports formats like:
@@ -181,40 +193,30 @@ pub fn parse(value: String) -> Result(Time, Nil) {
   let assert Ok(offset_pattern) = regex.from_string("(.*)([+|\\-].*)")
   let value = string.trim(value)
 
-  use #(date_string, offsetted_time_string) <- result.then(case
+  use #(day_string, offsetted_time_string) <- result.then(case
     [string.split(value, "T"), string.split(value, "t")]
   {
-    [[date_string, time_string], _] | [_, [date_string, time_string]] ->
-      Ok(#(date_string, time_string))
+    [[day_string, time_string], _] | [_, [day_string, time_string]] ->
+      Ok(#(day_string, time_string))
     [[_], [_]] -> Ok(#(value, "00"))
     _ -> Error(Nil)
   })
 
-  let date_string = string.trim(date_string)
+  let day_string = string.trim(day_string)
   let offsetted_time_string = string.trim(offsetted_time_string)
 
-  let #(time_string, offset_string) = case
-    string.ends_with(offsetted_time_string, "Z") || string.ends_with(
-      offsetted_time_string,
-      "z",
-    )
+  use #(time_string, offset_string) <- result.then(case
+    string.ends_with(offsetted_time_string, "Z")
+    || string.ends_with(offsetted_time_string, "z")
   {
-    True -> #(string.drop_right(offsetted_time_string, 1), "+00:00")
+    True -> Ok(#(string.drop_right(offsetted_time_string, 1), "+00:00"))
     False ->
       case regex.scan(offset_pattern, offsetted_time_string) {
-        [regex.Match(_, [option.Some(time_string), option.Some(offset_string)])] -> #(
-          time_string,
-          offset_string,
-        )
-        [] -> {
-          let local_offset_in_minutes = ffi_local_offset()
-          let assert Ok(local_offset_string) =
-            generate_offset(local_offset_in_minutes * 60_000_000)
-
-          #(offsetted_time_string, local_offset_string)
-        }
+        [regex.Match(_, [option.Some(time_string), option.Some(offset_string)])] ->
+          Ok(#(time_string, offset_string))
+        _ -> Error(Nil)
       }
-  }
+  })
 
   let time_string = string.replace(time_string, ":", "")
   use #(time_string, milli_seconds_result) <- result.then(case
@@ -236,11 +238,14 @@ pub fn parse(value: String) -> Result(Time, Nil) {
 
   case milli_seconds_result {
     Ok(milli_seconds) -> {
-      use [year, month, day] <- result.then(parse_date(date_string))
-      use [hour, minute, second] <- result.then(parse_time(time_string))
+      use day <- result.then(parse_date(day_string))
+      let assert [year, month, date] = day
+
+      use time_of_day <- result.then(parse_time(time_string))
+      let assert [hour, minute, second] = time_of_day
 
       from_parts(
-        #(year, month, day),
+        #(year, month, date),
         #(hour, minute, second, milli_seconds),
         offset_string,
       )
@@ -255,27 +260,39 @@ pub fn to_naive(value: Time) -> String {
   let #(#(year, month, day), #(hour, minute, second, milli_second), _) =
     to_parts(value)
 
-  int.to_string(year) <> "-" <> {
+  int.to_string(year)
+  <> "-"
+  <> {
     month
     |> int.to_string
     |> string.pad_left(2, "0")
-  } <> "-" <> {
+  }
+  <> "-"
+  <> {
     day
     |> int.to_string
     |> string.pad_left(2, "0")
-  } <> "T" <> {
+  }
+  <> "T"
+  <> {
     hour
     |> int.to_string
     |> string.pad_left(2, "0")
-  } <> ":" <> {
+  }
+  <> ":"
+  <> {
     minute
     |> int.to_string
     |> string.pad_left(2, "0")
-  } <> ":" <> {
+  }
+  <> ":"
+  <> {
     second
     |> int.to_string
     |> string.pad_left(2, "0")
-  } <> "." <> {
+  }
+  <> "."
+  <> {
     milli_second
     |> int.to_string
     |> string.pad_left(3, "0")
@@ -286,16 +303,16 @@ pub fn to_naive(value: Time) -> String {
 pub fn from_naive(value: String) -> Result(Time, Nil) {
   let value = string.trim(value)
 
-  use #(date_string, time_string) <- result.then(case
+  use #(day_string, time_string) <- result.then(case
     [string.split(value, "T"), string.split(value, "t")]
   {
-    [[date_string, time_string], [_]] | [[_], [date_string, time_string]] ->
-      Ok(#(date_string, time_string))
+    [[day_string, time_string], [_]] | [[_], [day_string, time_string]] ->
+      Ok(#(day_string, time_string))
     [[_], [_]] -> Ok(#(value, "00"))
     _ -> Error(Nil)
   })
 
-  let date_string = string.trim(date_string)
+  let day_string = string.trim(day_string)
   let time_string = string.trim(time_string)
 
   let time_string = string.replace(time_string, ":", "")
@@ -318,11 +335,14 @@ pub fn from_naive(value: String) -> Result(Time, Nil) {
 
   case milli_seconds_result {
     Ok(milli_seconds) -> {
-      use [year, month, day] <- result.then(parse_date(date_string))
-      use [hour, minute, second] <- result.then(parse_time(time_string))
+      use day <- result.then(parse_date(day_string))
+      let assert [year, month, date] = day
+
+      use time_of_day <- result.then(parse_time(time_string))
+      let assert [hour, minute, second] = time_of_day
 
       from_parts(
-        #(year, month, day),
+        #(year, month, date),
         #(hour, minute, second, milli_seconds),
         "Z",
       )
@@ -339,23 +359,36 @@ pub fn to_http(value: Time) -> String {
   let short_weekday = short_string_weekday(value)
   let short_month = short_string_month(value)
 
-  short_weekday <> ", " <> {
+  short_weekday
+  <> ", "
+  <> {
     day
     |> int.to_string
     |> string.pad_left(2, "0")
-  } <> " " <> short_month <> " " <> int.to_string(year) <> " " <> {
+  }
+  <> " "
+  <> short_month
+  <> " "
+  <> int.to_string(year)
+  <> " "
+  <> {
     hour
     |> int.to_string
     |> string.pad_left(2, "0")
-  } <> ":" <> {
+  }
+  <> ":"
+  <> {
     minute
     |> int.to_string
     |> string.pad_left(2, "0")
-  } <> ":" <> {
+  }
+  <> ":"
+  <> {
     second
     |> int.to_string
     |> string.pad_left(2, "0")
-  } <> " GMT"
+  }
+  <> " GMT"
 }
 
 /// like `to_http` but assumes the offset in the DateTime value instead of `GMT`
@@ -369,23 +402,37 @@ pub fn to_http_with_offset(value: Time) -> String {
     _ -> offset
   }
 
-  short_weekday <> ", " <> {
+  short_weekday
+  <> ", "
+  <> {
     day
     |> int.to_string
     |> string.pad_left(2, "0")
-  } <> " " <> short_month <> " " <> int.to_string(year) <> " " <> {
+  }
+  <> " "
+  <> short_month
+  <> " "
+  <> int.to_string(year)
+  <> " "
+  <> {
     hour
     |> int.to_string
     |> string.pad_left(2, "0")
-  } <> ":" <> {
+  }
+  <> ":"
+  <> {
     minute
     |> int.to_string
     |> string.pad_left(2, "0")
-  } <> ":" <> {
+  }
+  <> ":"
+  <> {
     second
     |> int.to_string
     |> string.pad_left(2, "0")
-  } <> " " <> offset
+  }
+  <> " "
+  <> offset
 }
 
 /// see [here](https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/Date)
@@ -403,16 +450,13 @@ pub fn to_http_with_offset(value: Time) -> String {
 ///   - `Tuesday, 01 November 2016 08:49:37 +06:30`
 pub fn from_http(value: String) -> Result(Time, Nil) {
   let value = string.trim(value)
-  let [weekday, rest] = string.split(value, ",")
+  use #(weekday, rest) <- result.then(string.split_once(value, ","))
 
   use <- bool.guard(
-    !list.any(
-      weekday_strings,
-      fn(weekday_item) {
-        let strings = weekday_item.1
-        strings.0 == weekday || strings.1 == weekday
-      },
-    ),
+    !list.any(weekday_strings, fn(weekday_item) {
+      let strings = weekday_item.1
+      strings.0 == weekday || strings.1 == weekday
+    }),
     Error(Nil),
   )
 
@@ -425,7 +469,7 @@ pub fn from_http(value: String) -> Result(Time, Nil) {
         #(
           int.parse(day_string),
           month_strings
-          |> list.index_map(fn(index, month) {
+          |> list.index_map(fn(month, index) {
             let strings = month.1
             #(index, strings.0, strings.1)
           })
@@ -469,15 +513,15 @@ pub fn from_http(value: String) -> Result(Time, Nil) {
       }
     }
 
-    [date_string, time_string, offset_string] ->
-      case string.split(date_string, "-") {
+    [day_string, time_string, offset_string] ->
+      case string.split(day_string, "-") {
         [day_string, month_string, year_string] -> {
           let time_string = string.replace(time_string, ":", "")
           case
             #(
               int.parse(day_string),
               month_strings
-              |> list.index_map(fn(index, month) {
+              |> list.index_map(fn(month, index) {
                 let strings = month.1
                 #(index, strings.0, strings.1)
               })
@@ -657,7 +701,10 @@ pub fn legible_difference(a: Time, b: Time) -> String {
         False ->
           amount
           |> int.absolute_value
-          |> int.to_string <> " " <> unit <> " ago"
+          |> int.to_string
+          <> " "
+          <> unit
+          <> " ago"
       }
     }
   }
@@ -670,14 +717,16 @@ pub fn add(value: Time, duration: duration.Duration) -> Time {
   case mt {
     option.Some(mt) ->
       Time(
-        wall_time: wt + duration,
+        wall_time: wt
+        + duration,
         offset: o,
         timezone: timezone,
         monotonic_time: option.Some(mt + duration),
       )
     option.None ->
       Time(
-        wall_time: wt + duration,
+        wall_time: wt
+        + duration,
         offset: o,
         timezone: timezone,
         monotonic_time: option.None,
@@ -692,14 +741,16 @@ pub fn subtract(value: Time, duration: duration.Duration) -> Time {
   case mt {
     option.Some(mt) ->
       Time(
-        wall_time: wt - duration,
+        wall_time: wt
+        - duration,
         offset: o,
         timezone: timezone,
         monotonic_time: option.Some(mt - duration),
       )
     option.None ->
       Time(
-        wall_time: wt - duration,
+        wall_time: wt
+        - duration,
         offset: o,
         timezone: timezone,
         monotonic_time: option.None,
@@ -717,15 +768,27 @@ pub fn weekday(value: Time) -> Weekday {
 }
 
 pub fn string_weekday(value: Time) -> String {
-  let weekday = weekday(value)
-  let assert Ok(#(weekday, _)) = list.key_find(weekday_strings, weekday)
-  weekday
+  case weekday(value) {
+    Mon -> "Monday"
+    Tue -> "Tuesday"
+    Wed -> "Wednesday"
+    Thu -> "Thursday"
+    Fri -> "Friday"
+    Sat -> "Saturday"
+    Sun -> "Sunday"
+  }
 }
 
 pub fn short_string_weekday(value: Time) -> String {
-  let weekday = weekday(value)
-  let assert Ok(#(_, weekday)) = list.key_find(weekday_strings, weekday)
-  weekday
+  case weekday(value) {
+    Mon -> "Mon"
+    Tue -> "Tue"
+    Wed -> "Wed"
+    Thu -> "Thu"
+    Fri -> "Fri"
+    Sat -> "Sat"
+    Sun -> "Sun"
+  }
 }
 
 pub fn month(value: Time) -> Month {
@@ -735,15 +798,37 @@ pub fn month(value: Time) -> Month {
 }
 
 pub fn string_month(value: Time) -> String {
-  let month = month(value)
-  let assert Ok(#(month, _)) = list.key_find(month_strings, month)
-  month
+  case month(value) {
+    Jan -> "January"
+    Feb -> "February"
+    Mar -> "March"
+    Apr -> "April"
+    May -> "May"
+    Jun -> "June"
+    Jul -> "July"
+    Aug -> "August"
+    Sep -> "September"
+    Oct -> "October"
+    Nov -> "November"
+    Dec -> "December"
+  }
 }
 
 pub fn short_string_month(value: Time) -> String {
-  let month = month(value)
-  let assert Ok(#(_, month)) = list.key_find(month_strings, month)
-  month
+  case month(value) {
+    Jan -> "Jan"
+    Feb -> "Feb"
+    Mar -> "Mar"
+    Apr -> "Apr"
+    May -> "May"
+    Jun -> "Jun"
+    Jul -> "Jul"
+    Aug -> "Aug"
+    Sep -> "Sep"
+    Oct -> "Oct"
+    Nov -> "Nov"
+    Dec -> "Dec"
+  }
 }
 
 /// can be used to create a time range starting from time `a` with step `s`
@@ -867,7 +952,7 @@ pub fn from_erlang_local_datetime(
   let #(date, time) = erlang_datetime
   let offset_in_minutes = ffi_local_offset()
 
-  let Time(wall_time, _, option.None, option.None) =
+  let assert Time(wall_time, _, option.None, option.None) =
     unix_epoch
     |> set_day(Day(date.0, date.1, date.2))
     |> set_time_of_day(TimeOfDay(time.0, time.1, time.2, 0))
@@ -876,19 +961,17 @@ pub fn from_erlang_local_datetime(
 
   Time(
     wall_time,
-    offset_in_minutes * 60_000_000,
-    option.map(
-      timezone,
-      fn(tz) {
-        case
-          zones.list
-          |> list.any(fn(item) { item.0 == tz })
-        {
-          True -> option.Some(tz)
-          False -> option.None
-        }
-      },
-    )
+    offset_in_minutes
+    * 60_000_000,
+    option.map(timezone, fn(tz) {
+      case
+        zones.list
+        |> list.any(fn(item) { item.0 == tz })
+      {
+        True -> option.Some(tz)
+        False -> option.None
+      }
+    })
     |> option.flatten,
     option.None,
   )

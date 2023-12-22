@@ -59,44 +59,38 @@ pub fn years(value: Int) -> Duration {
 /// Use this if you need short durations where a year just means 365 days and a month just means 30 days
 pub fn new(values: List(#(Int, Unit))) -> Duration {
   values
-  |> list.fold(
-    0,
-    fn(total, current) {
-      case current {
-        #(amount, MicroSecond) -> total + amount
-        #(amount, MilliSecond) -> total + amount * milli_second
-        #(amount, Second) -> total + amount * second
-        #(amount, Minute) -> total + amount * minute
-        #(amount, Hour) -> total + amount * hour
-        #(amount, Day) -> total + amount * day
-        #(amount, Week) -> total + amount * week
-        #(amount, Month) -> total + amount * month
-        #(amount, Year) -> total + amount * year
-      }
-    },
-  )
+  |> list.fold(0, fn(total, current) {
+    case current {
+      #(amount, MicroSecond) -> total + amount
+      #(amount, MilliSecond) -> total + amount * milli_second
+      #(amount, Second) -> total + amount * second
+      #(amount, Minute) -> total + amount * minute
+      #(amount, Hour) -> total + amount * hour
+      #(amount, Day) -> total + amount * day
+      #(amount, Week) -> total + amount * week
+      #(amount, Month) -> total + amount * month
+      #(amount, Year) -> total + amount * year
+    }
+  })
   |> Duration
 }
 
 /// Use this if you need very long durations where small inaccuracies could lead to large errors
 pub fn accurate_new(values: List(#(Int, Unit))) -> Duration {
   values
-  |> list.fold(
-    0,
-    fn(total, current) {
-      case current {
-        #(amount, MicroSecond) -> total + amount
-        #(amount, MilliSecond) -> total + amount * milli_second
-        #(amount, Second) -> total + amount * second
-        #(amount, Minute) -> total + amount * minute
-        #(amount, Hour) -> total + amount * hour
-        #(amount, Day) -> total + amount * day
-        #(amount, Week) -> total + amount * week
-        #(amount, Month) -> total + amount * accurate_month
-        #(amount, Year) -> total + amount * accurate_year
-      }
-    },
-  )
+  |> list.fold(0, fn(total, current) {
+    case current {
+      #(amount, MicroSecond) -> total + amount
+      #(amount, MilliSecond) -> total + amount * milli_second
+      #(amount, Second) -> total + amount * second
+      #(amount, Minute) -> total + amount * minute
+      #(amount, Hour) -> total + amount * hour
+      #(amount, Day) -> total + amount * day
+      #(amount, Week) -> total + amount * week
+      #(amount, Month) -> total + amount * accurate_month
+      #(amount, Year) -> total + amount * accurate_year
+    }
+  })
   |> Duration
 }
 
@@ -216,7 +210,7 @@ fn inner_blur(values: List(#(Int, Unit))) -> #(Int, Unit) {
   let assert Ok(second) = list.at(values, 0)
   let leading = list.at(values, 1)
   use <- bool.guard(result.is_error(leading), second)
-  let [leading] = result.values([leading])
+  let assert [leading] = result.values([leading])
 
   let assert Ok(leading_unit) = list.key_find(unit_values, leading.1)
   let assert Ok(second_unit) = list.key_find(unit_values, second.1)
@@ -293,7 +287,7 @@ pub fn parse(expression: String) -> Result(Duration, Nil) {
     string.starts_with(expression, "accurate:")
   {
     True -> {
-      let [_, expression] = string.split(expression, ":")
+      let assert [_, expression] = string.split(expression, ":")
       #(accurate_new, expression)
     }
     False -> #(new, expression)
@@ -307,14 +301,12 @@ pub fn parse(expression: String) -> Result(Duration, Nil) {
       case item {
         regex.Match(_, [sign_option, option.Some(amount_string)]) -> {
           use amount <- result.then(int.parse(amount_string))
-          #(
-            case sign_option {
-              option.None | option.Some("+") -> amount
-              option.Some("-") -> -1 * amount
-            },
-            MicroSecond,
-          )
-          |> Ok
+
+          case sign_option {
+            option.Some("-") -> Ok(#(-1 * amount, MicroSecond))
+            option.None | option.Some("+") -> Ok(#(amount, MicroSecond))
+            option.Some(_) -> Error(Nil)
+          }
         }
 
         regex.Match(
@@ -322,18 +314,15 @@ pub fn parse(expression: String) -> Result(Duration, Nil) {
           [sign_option, option.Some(amount_string), option.Some(unit)],
         ) -> {
           use amount <- result.then(int.parse(amount_string))
-          use #(unit, _) <- result.then(list.find(
-            units,
-            fn(item) { list.contains(item.1, unit) },
-          ))
-          #(
-            case sign_option {
-              option.None | option.Some("+") -> amount
-              option.Some("-") -> -1 * amount
-            },
-            unit,
+          use #(unit, _) <- result.then(
+            list.find(units, fn(item) { list.contains(item.1, unit) }),
           )
-          |> Ok
+
+          case sign_option {
+            option.Some("-") -> Ok(#(-1 * amount, unit))
+            option.None | option.Some("+") -> Ok(#(amount, unit))
+            option.Some(_) -> Error(Nil)
+          }
         }
 
         _ -> Error(Nil)
