@@ -172,23 +172,29 @@ pub fn to_iso8601(value: Time) -> String {
   <> offset
 }
 
-/// Supports formats like:
+/// If you need to parse an `ISO8601` string, this is probably what you're looking for.
 /// 
-///   - `2019t14-4`
+/// Given the huge surface area that `ISO8601` covers, it does not make sense for `birl`
+/// to support all of it in one function, so this function parses only strings for which both
+/// day and time of day can be extracted or deduced. Some acceptable examples are given below:
 /// 
-///   - `20190326t1400-4`
+///   - `2019t14-4` -> `2019-01-01T14:00:00.000-04:00`
 /// 
-///   - `19051222T16:38-3`
+///   - `2019-03-26t14:00.9z` -> `2019-03-26T14:00:00.900Z`
 /// 
-///   - `2019-03-26t14:00.9z`
+///   - `2019-03-26+330` -> `2019-03-26T00:00:00.000+03:30`
 /// 
-///   - `1905-12-22T163823+0330`
+///   - `20190326t1400-4` -> `2019-03-26T14:00:00.000-04:00`
 /// 
-///   - `2019-03-26T14:00:00.9Z`
+///   - `19051222T16:38-3` -> `1905-12-22T16:38:00.000-03:00`
 /// 
-///   - `2019-03-26T14:00:00,4999Z`
+///   - `2019-03-26T14:00:00.9Z` -> `2019-03-26T14:00:00.900Z`
 /// 
-///   - `1905-12-22T16:38:23.000+03:30`
+///   - `2019-03-26T14:00:00,4999Z` -> `2019-03-26T14:00:00.499Z`
+/// 
+///   - `1905-12-22T163823+0330` -> `1905-12-22T16:38:23.000+03:30`
+/// 
+///   - `1905-12-22T16:38:23.000+03:30` -> `1905-12-22T16:38:23.000+03:30`
 pub fn parse(value: String) -> Result(Time, Nil) {
   let assert Ok(offset_pattern) = regex.from_string("(.*)([+|\\-].*)")
   let value = string.trim(value)
@@ -205,16 +211,26 @@ pub fn parse(value: String) -> Result(Time, Nil) {
   let day_string = string.trim(day_string)
   let offsetted_time_string = string.trim(offsetted_time_string)
 
-  use #(time_string, offset_string) <- result.then(case
+  use #(day_string, time_string, offset_string) <- result.then(case
     string.ends_with(offsetted_time_string, "Z")
     || string.ends_with(offsetted_time_string, "z")
   {
-    True -> Ok(#(string.drop_right(offsetted_time_string, 1), "+00:00"))
+    True ->
+      Ok(#(day_string, string.drop_right(offsetted_time_string, 1), "+00:00"))
     False ->
       case regex.scan(offset_pattern, offsetted_time_string) {
         [regex.Match(_, [option.Some(time_string), option.Some(offset_string)])] ->
-          Ok(#(time_string, offset_string))
-        _ -> Error(Nil)
+          Ok(#(day_string, time_string, offset_string))
+        _ ->
+          case regex.scan(offset_pattern, day_string) {
+            [
+              regex.Match(
+                _,
+                [option.Some(day_string), option.Some(offset_string)],
+              ),
+            ] -> Ok(#(day_string, "00", offset_string))
+            _ -> Error(Nil)
+          }
       }
   })
 
@@ -222,9 +238,11 @@ pub fn parse(value: String) -> Result(Time, Nil) {
   use #(time_string, milli_seconds_result) <- result.then(case
     [string.split(time_string, "."), string.split(time_string, ",")]
   {
-    [[_], [_]] -> Ok(#(time_string, Ok(0)))
+    [[_], [_]] -> {
+      Ok(#(time_string, Ok(0)))
+    }
     [[time_string, milli_seconds_string], [_]]
-    | [[_], [time_string, milli_seconds_string]] ->
+    | [[_], [time_string, milli_seconds_string]] -> {
       Ok(#(
         time_string,
         milli_seconds_string
@@ -232,16 +250,17 @@ pub fn parse(value: String) -> Result(Time, Nil) {
         |> string.pad_right(3, "0")
         |> int.parse,
       ))
+    }
 
     _ -> Error(Nil)
   })
 
   case milli_seconds_result {
     Ok(milli_seconds) -> {
-      use day <- result.then(parse_date(day_string))
+      use day <- result.then(parse_date_section(day_string))
       let assert [year, month, date] = day
 
-      use time_of_day <- result.then(parse_time(time_string))
+      use time_of_day <- result.then(parse_time_section(time_string))
       let assert [hour, minute, second] = time_of_day
 
       from_parts(
@@ -251,6 +270,83 @@ pub fn parse(value: String) -> Result(Time, Nil) {
       )
     }
 
+    Error(Nil) -> Error(Nil)
+  }
+}
+
+/// This function parses `ISO8601` strings in which no date is specified, which
+/// means such inputs don't actually represent a particular moment in time. That's why
+/// the result of this function is an instance of `TimeOfDay` along with the offset specificed
+/// in the string. Some acceptable examples are given below:
+///
+///   - `t25z` -> `#(TimeOfDay(2, 5, 0, 0), "Z")`
+/// 
+///   - `14-4` -> `#(TimeOfDay(14, 0, 0, 0), "-04:00")`
+/// 
+///   - `T145+4` -> `#(TimeOfDay(14, 5, 0, 0), "+04:00")`
+/// 
+///   - `16:38-3` -> `#(TimeOfDay(16, 38, 0, 0), "-03:00")`
+/// 
+///   - `t14:65.9z` -> `#(TimeOfDay(14, 6, 5, 900), "-04:00")`
+/// 
+///   - `163823+0330` -> `#(TimeOfDay(16, 38, 23, 0), "+03:30")`
+/// 
+///   - `T16:38:23.050+03:30` -> `#(TimeOfDay(16, 38, 23, 50), "+03:30")`
+pub fn parse_time_of_day(value: String) -> Result(#(TimeOfDay, String), Nil) {
+  let assert Ok(offset_pattern) = regex.from_string("(.*)([+|\\-].*)")
+
+  let value = case
+    [string.starts_with(value, "T"), string.starts_with(value, "t")]
+  {
+    [True, _] | [_, True] -> string.drop_left(value, 1)
+    _ -> value
+  }
+
+  use #(time_string, offset_string) <- result.then(case
+    string.ends_with(value, "Z")
+    || string.ends_with(value, "z")
+  {
+    True -> Ok(#(string.drop_right(value, 1), "+00:00"))
+    False ->
+      case regex.scan(offset_pattern, value) {
+        [regex.Match(_, [option.Some(time_string), option.Some(offset_string)])] ->
+          Ok(#(time_string, offset_string))
+        _ -> Error(Nil)
+      }
+  })
+
+  let time_string = string.replace(time_string, ":", "")
+
+  use #(time_string, milli_seconds_result) <- result.then(case
+    [string.split(time_string, "."), string.split(time_string, ",")]
+  {
+    [[_], [_]] -> {
+      Ok(#(time_string, Ok(0)))
+    }
+    [[time_string, milli_seconds_string], [_]]
+    | [[_], [time_string, milli_seconds_string]] -> {
+      Ok(#(
+        time_string,
+        milli_seconds_string
+        |> string.slice(0, 3)
+        |> string.pad_right(3, "0")
+        |> int.parse,
+      ))
+    }
+
+    _ -> Error(Nil)
+  })
+
+  case milli_seconds_result {
+    Ok(milli_seconds) -> {
+      use time_of_day <- result.then(parse_time_section(time_string))
+      let assert [hour, minute, second] = time_of_day
+
+      use offset <- result.then(parse_offset(offset_string))
+      use offset_string <- result.then(generate_offset(offset))
+
+      Ok(#(TimeOfDay(hour, minute, second, milli_seconds), offset_string))
+    }
     Error(Nil) -> Error(Nil)
   }
 }
@@ -335,10 +431,10 @@ pub fn from_naive(value: String) -> Result(Time, Nil) {
 
   case milli_seconds_result {
     Ok(milli_seconds) -> {
-      use day <- result.then(parse_date(day_string))
+      use day <- result.then(parse_date_section(day_string))
       let assert [year, month, date] = day
 
-      use time_of_day <- result.then(parse_time(time_string))
+      use time_of_day <- result.then(parse_time_section(time_string))
       let assert [hour, minute, second] = time_of_day
 
       from_parts(
@@ -477,7 +573,7 @@ pub fn from_http(value: String) -> Result(Time, Nil) {
             month.1 == month_string || month.2 == month_string
           }),
           int.parse(year_string),
-          parse_time(time_string),
+          parse_time_section(time_string),
         )
       {
         #(
@@ -529,7 +625,7 @@ pub fn from_http(value: String) -> Result(Time, Nil) {
                 month.1 == month_string || month.2 == month_string
               }),
               int.parse(year_string),
-              parse_time(time_string),
+              parse_time_section(time_string),
             )
           {
             #(
@@ -1031,9 +1127,17 @@ fn parse_offset(offset: String) -> Result(Int, Nil) {
     }
     [offset] ->
       case string.length(offset) {
-        1 | 2 -> {
+        1 -> {
           use hour <- result.then(int.parse(offset))
           Ok(sign * hour * 3600 * 1_000_000)
+        }
+        2 -> {
+          use number <- result.then(int.parse(offset))
+          case number < 14 {
+            True -> Ok(sign * number * 3600 * 1_000_000)
+            False ->
+              Ok(sign * { number / 10 * 60 + number % 10 } * 60 * 1_000_000)
+          }
         }
         3 -> {
           let assert Ok(hour_str) = string.first(offset)
@@ -1116,7 +1220,7 @@ fn generate_offset(offset: Int) -> Result(String, Nil) {
   }
 }
 
-fn parse_date(date: String) -> Result(List(Int), Nil) {
+fn parse_date_section(date: String) -> Result(List(Int), Nil) {
   use <- bool.guard(is_invalid_date(date), Error(Nil))
 
   case string.contains(date, "-") {
@@ -1151,7 +1255,7 @@ fn parse_date(date: String) -> Result(List(Int), Nil) {
     }
 
     False ->
-      parse_iso_section(
+      parse_section(
         date,
         "(\\d{4})(1[0-2]|0?[0-9])?(3[0-1]|[1-2][0-9]|0?[0-9])?",
         1,
@@ -1160,10 +1264,10 @@ fn parse_date(date: String) -> Result(List(Int), Nil) {
   |> list.try_map(function.identity)
 }
 
-fn parse_time(time: String) -> Result(List(Int), Nil) {
+fn parse_time_section(time: String) -> Result(List(Int), Nil) {
   use <- bool.guard(is_invalid_time(time), Error(Nil))
 
-  parse_iso_section(
+  parse_section(
     time,
     "(2[0-3]|1[0-9]|0?[0-9])([1-5][0-9]|0?[0-9])?([1-5][0-9]|0?[0-9])?",
     0,
@@ -1196,7 +1300,7 @@ fn is_invalid_time(time: String) -> Bool {
   })
 }
 
-fn parse_iso_section(
+fn parse_section(
   section: String,
   pattern_string: String,
   default: Int,

@@ -122,14 +122,6 @@ pub fn circular_test() {
   |> should.equal(order.Eq)
 }
 
-pub fn parse_relative_test() {
-  let now = birl.now()
-  birl.parse_relative(now, "8 minutes since")
-  |> should.be_ok
-  |> birl.legible_difference(now, _)
-  |> should.equal("8 minutes ago")
-}
-
 pub fn weird_value1_test() {
   "2019-03-26T14:00:00.9Z"
   |> birl.parse
@@ -163,6 +155,14 @@ pub fn weird_value4_test() {
 }
 
 pub fn weird_value5_test() {
+  "2019-03-26+35"
+  |> birl.parse
+  |> should.be_ok
+  |> birl.to_iso8601
+  |> should.equal("2019-03-26T00:00:00.000+03:05")
+}
+
+pub fn weird_value6_test() {
   "2019t14"
   |> birl.from_naive
   |> should.be_ok
@@ -170,7 +170,7 @@ pub fn weird_value5_test() {
   |> should.equal("2019-01-01T14:00:00.000")
 }
 
-pub fn weird_value6_test() {
+pub fn weird_value7_test() {
   "2019-4"
   |> birl.from_naive
   |> should.be_ok
@@ -178,7 +178,7 @@ pub fn weird_value6_test() {
   |> should.equal("2019-04-01T00:00:00.000")
 }
 
-pub fn weird_value7_test() {
+pub fn weird_value8_test() {
   "20190326t1400,02"
   |> birl.from_naive
   |> should.be_ok
