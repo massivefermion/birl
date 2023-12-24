@@ -48,24 +48,14 @@ local_timezone() ->
             case os:getenv("TZ") of
                 ":" ++ Path ->
                     case timezone_from_path(Path) of
-                        <<>> -> none;
+                        <<>> -> local_timezone_from_etc();
                         TZ -> {some, TZ}
                     end;
                 false ->
-                    case file:read_file("/etc/timezone") of
-                        {ok, NewLinedTimezone} ->
-                            {some, string:trim(NewLinedTimezone)};
-                        {error, _} ->
-                            case file:read_link("/etc/localtime") of
-                                {ok, Path} ->
-                                    {some, timezone_from_path(Path)};
-                                {error, _} ->
-                                    none
-                            end
-                    end;
+                    local_timezone_from_etc();
                 TZOrPath ->
                     case timezone_from_path(TZOrPath) of
-                        <<>> -> none;
+                        <<>> -> local_timezone_from_etc();
                         TZ -> {some, TZ}
                     end
             end;
@@ -79,6 +69,19 @@ local_timezone() ->
             case lists:keyfind("TimeZoneKeyName", 1, Values) of
                 {"TimeZoneKeyName", WinZone} -> win_to_iana(string:trim(WinZone));
                 false -> none
+            end
+    end.
+
+local_timezone_from_etc() ->
+    case file:read_file("/etc/timezone") of
+        {ok, NewLinedTimezone} ->
+            {some, string:trim(NewLinedTimezone)};
+        {error, _} ->
+            case file:read_link("/etc/localtime") of
+                {ok, Path} ->
+                    {some, timezone_from_path(Path)};
+                {error, _} ->
+                    none
             end
     end.
 
