@@ -20,7 +20,7 @@ export function monotonic_now() {
 export function to_parts(timestamp, offset) {
   const date = new Date((timestamp + offset) / 1000);
   return [
-    [date.getFullYear(), date.getUTCMonth() + 1, date.getUTCDate()],
+    [date.getUTCFullYear(), date.getUTCMonth() + 1, date.getUTCDate()],
     [
       date.getUTCHours(),
       date.getUTCMinutes(),
