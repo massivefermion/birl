@@ -170,10 +170,10 @@ pub fn accurate_decompose(duration: Duration) -> List(#(Int, Unit)) {
 /// 
 /// if the duration is not an integer multiple of the unit,
 /// the remainder will be disgarded if it's less than two thirds of the unit,
-/// otherwise a single unit will be added to the multiplier
+/// otherwise a single unit will be added to the multiplier.
 /// 
-///   - `duration.blur_to(duration.days(16), duration.Month)` ->  0
-///   - `duration.blur_to(duration.days(20), duration.Month)` ->  1
+///   - `blur_to(days(16), Month)` ->  `0`
+///   - `blur_to(days(20), Month)` ->  `1`
 pub fn blur_to(duration: Duration, unit: Unit) -> Int {
   let assert Ok(unit_value) = list.key_find(unit_values, unit)
   let Duration(value) = duration
