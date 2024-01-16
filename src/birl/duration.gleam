@@ -28,6 +28,12 @@ pub fn add(a: Duration, b: Duration) -> Duration {
   Duration(a + b)
 }
 
+pub fn subtract(a: Duration, b: Duration) -> Duration {
+  let Duration(a) = a
+  let Duration(b) = b
+  Duration(a - b)
+}
+
 pub fn seconds(value: Int) -> Duration {
   Duration(value * second)
 }
@@ -56,7 +62,7 @@ pub fn years(value: Int) -> Duration {
   Duration(value * year)
 }
 
-/// Use this if you need short durations where a year just means 365 days and a month just means 30 days
+/// use this if you need short durations where a year just means 365 days and a month just means 30 days
 pub fn new(values: List(#(Int, Unit))) -> Duration {
   values
   |> list.fold(0, fn(total, current) {
@@ -75,7 +81,7 @@ pub fn new(values: List(#(Int, Unit))) -> Duration {
   |> Duration
 }
 
-/// Use this if you need very long durations where small inaccuracies could lead to large errors
+/// use this if you need very long durations where small inaccuracies could lead to large errors
 pub fn accurate_new(values: List(#(Int, Unit))) -> Duration {
   values
   |> list.fold(0, fn(total, current) {
@@ -94,7 +100,7 @@ pub fn accurate_new(values: List(#(Int, Unit))) -> Duration {
   |> Duration
 }
 
-/// Use this if you need short durations where a year just means 365 days and a month just means 30 days
+/// use this if you need short durations where a year just means 365 days and a month just means 30 days
 pub fn decompose(duration: Duration) -> List(#(Int, Unit)) {
   let Duration(value) = duration
   let absolute_value = int.absolute_value(value)
@@ -127,7 +133,7 @@ pub fn decompose(duration: Duration) -> List(#(Int, Unit)) {
   })
 }
 
-/// Use this if you need very long durations where small inaccuracies could lead to large errors
+/// use this if you need very long durations where small inaccuracies could lead to large errors
 pub fn accurate_decompose(duration: Duration) -> List(#(Int, Unit)) {
   let Duration(value) = duration
   let absolute_value = int.absolute_value(value)
@@ -160,12 +166,27 @@ pub fn accurate_decompose(duration: Duration) -> List(#(Int, Unit)) {
   })
 }
 
+/// approximates the duration by only the given unit
+/// 
+/// if the duration is not an integer multiple of the unit,
+/// the remainder will be disgarded if it's less than two thirds of the unit,
+/// otherwise a single unit will be added to the multiplier
+/// 
+///   - `duration.blur_to(duration.days(16), duration.Month)` ->  0
+///   - `duration.blur_to(duration.days(20), duration.Month)` ->  1
+pub fn blur_to(duration: Duration, unit: Unit) -> Int {
+  let assert Ok(unit_value) = list.key_find(unit_values, unit)
+  let Duration(value) = duration
+  let #(unit_counts, remaining) = extract(value, unit_value)
+  case remaining >= unit_value * 2 / 3 {
+    True -> unit_counts + 1
+    False -> unit_counts
+  }
+}
+
 /// approximates the duration by a value in a single unit
 pub fn blur(duration: Duration) -> #(Int, Unit) {
-  case
-    duration
-    |> decompose
-  {
+  case decompose(duration) {
     [] -> #(0, MicroSecond)
     decomposed ->
       decomposed
@@ -256,7 +277,7 @@ const units = [
   #(MilliSecond, milli_second_units),
 ]
 
-/// You can use this function to create a new duration using expressions like:
+/// you can use this function to create a new duration using expressions like:
 ///
 ///     "accurate: 1 Year - 2days + 152M -1h + 25 years + 25secs"
 ///
@@ -278,8 +299,8 @@ const units = [
 ///
 ///     MilliSecond:  ms, Msec, mSecs, milliSecond, MilliSecond, ...
 ///
-/// Numbers with no unit are considered as microseconds.
-/// Specifying `accurate:` is equivalent to using `accurate_new`.
+/// numbers with no unit are considered as microseconds.
+/// specifying `accurate:` is equivalent to using `accurate_new`.
 pub fn parse(expression: String) -> Result(Duration, Nil) {
   let assert Ok(re) = regex.from_string("([+|\\-])?\\s*(\\d+)\\s*(\\w+)?")
 
@@ -338,6 +359,6 @@ pub fn parse(expression: String) -> Result(Duration, Nil) {
   }
 }
 
-fn extract(duration: Int, unit: Int) -> #(Int, Int) {
-  #(duration / unit, duration % unit)
+fn extract(duration: Int, unit_value: Int) -> #(Int, Int) {
+  #(duration / unit_value, duration % unit_value)
 }

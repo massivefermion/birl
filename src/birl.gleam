@@ -66,8 +66,7 @@ pub fn now() -> Time {
 
   Time(
     now,
-    offset_in_minutes
-    * 60_000_000,
+    offset_in_minutes * 60_000_000,
     option.map(timezone, fn(tz) {
       case
         zones.list
@@ -82,16 +81,16 @@ pub fn now() -> Time {
   )
 }
 
-/// Use this to get the current time in utc
+/// use this to get the current time in utc
 pub fn utc_now() -> Time {
   let now = ffi_now()
   let monotonic_now = ffi_monotonic_now()
   Time(now, 0, option.Some("Etc/UTC"), option.Some(monotonic_now))
 }
 
-/// Use this to get the current time with a given offset.
+/// use this to get the current time with a given offset.
 ///
-/// Some examples of acceptable offsets:
+/// some examples of acceptable offsets:
 ///
 /// `"+330", "03:30", "-8:00","-7", "-0400", "03"`
 pub fn now_with_offset(offset: String) -> Result(Time, Nil) {
@@ -112,8 +111,7 @@ pub fn now_with_timezone(timezone: String) -> Result(Time, Nil) {
       let monotonic_now = ffi_monotonic_now()
       Time(
         now,
-        offset
-        * 1_000_000,
+        offset * 1_000_000,
         option.Some(timezone),
         option.Some(monotonic_now),
       )
@@ -126,6 +124,104 @@ pub fn now_with_timezone(timezone: String) -> Result(Time, Nil) {
 
 pub fn monotonic_now() -> Int {
   ffi_monotonic_now()
+}
+
+/// returns a string which is the date part of an ISO8601 string along with the offset
+pub fn to_date_string(value: Time) -> String {
+  let #(#(year, month, day), _, offset) = to_parts(value)
+
+  int.to_string(year)
+  <> "-"
+  <> {
+    month
+    |> int.to_string
+    |> string.pad_left(2, "0")
+  }
+  <> "-"
+  <> {
+    day
+    |> int.to_string
+    |> string.pad_left(2, "0")
+  }
+  <> offset
+}
+
+/// like `to_date_string` except it does not contain the offset
+pub fn to_naive_date_string(value: Time) -> String {
+  let #(#(year, month, day), _, _) = to_parts(value)
+
+  int.to_string(year)
+  <> "-"
+  <> {
+    month
+    |> int.to_string
+    |> string.pad_left(2, "0")
+  }
+  <> "-"
+  <> {
+    day
+    |> int.to_string
+    |> string.pad_left(2, "0")
+  }
+}
+
+/// returns a string which is the time part of an ISO8601 string along with the offset
+pub fn to_time_string(value: Time) -> String {
+  let #(_, #(hour, minute, second, milli_second), offset) = to_parts(value)
+
+  {
+    hour
+    |> int.to_string
+    |> string.pad_left(2, "0")
+  }
+  <> ":"
+  <> {
+    minute
+    |> int.to_string
+    |> string.pad_left(2, "0")
+  }
+  <> ":"
+  <> {
+    second
+    |> int.to_string
+    |> string.pad_left(2, "0")
+  }
+  <> "."
+  <> {
+    milli_second
+    |> int.to_string
+    |> string.pad_left(3, "0")
+  }
+  <> offset
+}
+
+/// like `to_time_string` except it does not contain the offset
+pub fn to_naive_time_string(value: Time) -> String {
+  let #(_, #(hour, minute, second, milli_second), _) = to_parts(value)
+
+  {
+    hour
+    |> int.to_string
+    |> string.pad_left(2, "0")
+  }
+  <> ":"
+  <> {
+    minute
+    |> int.to_string
+    |> string.pad_left(2, "0")
+  }
+  <> ":"
+  <> {
+    second
+    |> int.to_string
+    |> string.pad_left(2, "0")
+  }
+  <> "."
+  <> {
+    milli_second
+    |> int.to_string
+    |> string.pad_left(3, "0")
+  }
 }
 
 pub fn to_iso8601(value: Time) -> String {
@@ -172,9 +268,9 @@ pub fn to_iso8601(value: Time) -> String {
   <> offset
 }
 
-/// If you need to parse an `ISO8601` string, this is probably what you're looking for.
+/// if you need to parse an `ISO8601` string, this is probably what you're looking for.
 /// 
-/// Given the huge surface area that `ISO8601` covers, it does not make sense for `birl`
+/// given the huge surface area that `ISO8601` covers, it does not make sense for `birl`
 /// to support all of it in one function, so this function parses only strings for which both
 /// day and time of day can be extracted or deduced. Some acceptable examples are given below:
 /// 
@@ -274,7 +370,7 @@ pub fn parse(value: String) -> Result(Time, Nil) {
   }
 }
 
-/// This function parses `ISO8601` strings in which no date is specified, which
+/// this function parses `ISO8601` strings in which no date is specified, which
 /// means such inputs don't actually represent a particular moment in time. That's why
 /// the result of this function is an instance of `TimeOfDay` along with the offset specificed
 /// in the string. Some acceptable examples are given below:
@@ -295,7 +391,7 @@ pub fn parse(value: String) -> Result(Time, Nil) {
 pub fn parse_time_of_day(value: String) -> Result(#(TimeOfDay, String), Nil) {
   let assert Ok(offset_pattern) = regex.from_string("(.*)([+|\\-].*)")
 
-  let value = case
+  let time_string = case
     [string.starts_with(value, "T"), string.starts_with(value, "t")]
   {
     [True, _] | [_, True] -> string.drop_left(value, 1)
@@ -303,8 +399,8 @@ pub fn parse_time_of_day(value: String) -> Result(#(TimeOfDay, String), Nil) {
   }
 
   use #(time_string, offset_string) <- result.then(case
-    string.ends_with(value, "Z")
-    || string.ends_with(value, "z")
+    string.ends_with(time_string, "Z")
+    || string.ends_with(time_string, "z")
   {
     True -> Ok(#(string.drop_right(value, 1), "+00:00"))
     False ->
@@ -346,6 +442,50 @@ pub fn parse_time_of_day(value: String) -> Result(#(TimeOfDay, String), Nil) {
       use offset_string <- result.then(generate_offset(offset))
 
       Ok(#(TimeOfDay(hour, minute, second, milli_seconds), offset_string))
+    }
+    Error(Nil) -> Error(Nil)
+  }
+}
+
+/// accepts fromats similar to the ones listed for `parse_time_of_day` except that there shoundn't be any offset information
+pub fn parse_naive_time_of_day(
+  value: String,
+) -> Result(#(TimeOfDay, String), Nil) {
+  let time_string = case
+    [string.starts_with(value, "T"), string.starts_with(value, "t")]
+  {
+    [True, _] | [_, True] -> string.drop_left(value, 1)
+    _ -> value
+  }
+
+  let time_string = string.replace(time_string, ":", "")
+
+  use #(time_string, milli_seconds_result) <- result.then(case
+    [string.split(time_string, "."), string.split(time_string, ",")]
+  {
+    [[_], [_]] -> {
+      Ok(#(time_string, Ok(0)))
+    }
+    [[time_string, milli_seconds_string], [_]]
+    | [[_], [time_string, milli_seconds_string]] -> {
+      Ok(#(
+        time_string,
+        milli_seconds_string
+        |> string.slice(0, 3)
+        |> string.pad_right(3, "0")
+        |> int.parse,
+      ))
+    }
+
+    _ -> Error(Nil)
+  })
+
+  case milli_seconds_result {
+    Ok(milli_seconds) -> {
+      use time_of_day <- result.then(parse_time_section(time_string))
+      let assert [hour, minute, second] = time_of_day
+
+      Ok(#(TimeOfDay(hour, minute, second, milli_seconds), "Z"))
     }
     Error(Nil) -> Error(Nil)
   }
@@ -395,7 +535,7 @@ pub fn to_naive(value: Time) -> String {
   }
 }
 
-/// Accepts fromats similar to the ones listed for `parse` except that there shoundn't be any offset information
+/// accepts fromats similar to the ones listed for `parse` except that there shoundn't be any offset information
 pub fn from_naive(value: String) -> Result(Time, Nil) {
   let value = string.trim(value)
 
@@ -813,16 +953,14 @@ pub fn add(value: Time, duration: duration.Duration) -> Time {
   case mt {
     option.Some(mt) ->
       Time(
-        wall_time: wt
-        + duration,
+        wall_time: wt + duration,
         offset: o,
         timezone: timezone,
         monotonic_time: option.Some(mt + duration),
       )
     option.None ->
       Time(
-        wall_time: wt
-        + duration,
+        wall_time: wt + duration,
         offset: o,
         timezone: timezone,
         monotonic_time: option.None,
@@ -837,16 +975,14 @@ pub fn subtract(value: Time, duration: duration.Duration) -> Time {
   case mt {
     option.Some(mt) ->
       Time(
-        wall_time: wt
-        - duration,
+        wall_time: wt - duration,
         offset: o,
         timezone: timezone,
         monotonic_time: option.Some(mt - duration),
       )
     option.None ->
       Time(
-        wall_time: wt
-        - duration,
+        wall_time: wt - duration,
         offset: o,
         timezone: timezone,
         monotonic_time: option.None,
@@ -980,7 +1116,7 @@ pub fn get_timezone(value: Time) -> option.Option(String) {
 
 /// use this to change the offset of a given time value.
 ///
-/// Some examples of acceptable offsets:
+/// some examples of acceptable offsets:
 ///
 /// `"+330", "03:30", "-8:00","-7", "-0400", "03", "Z"`
 pub fn set_offset(value: Time, new_offset: String) -> Result(Time, Nil) {
@@ -1025,7 +1161,9 @@ pub fn get_time_of_day(value: Time) -> TimeOfDay {
 
 @target(erlang)
 /// calculates erlang datetime using the offset in the DateTime value
-pub fn to_erlang_datetime(value: Time) -> #(#(Int, Int, Int), #(Int, Int, Int)) {
+pub fn to_erlang_datetime(
+  value: Time,
+) -> #(#(Int, Int, Int), #(Int, Int, Int)) {
   let #(date, #(hour, minute, second, _), _) = to_parts(value)
   #(date, #(hour, minute, second))
 }
@@ -1057,8 +1195,7 @@ pub fn from_erlang_local_datetime(
 
   Time(
     wall_time,
-    offset_in_minutes
-    * 60_000_000,
+    offset_in_minutes * 60_000_000,
     option.map(timezone, fn(tz) {
       case
         zones.list
