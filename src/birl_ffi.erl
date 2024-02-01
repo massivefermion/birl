@@ -37,9 +37,9 @@ local_offset() ->
     {{_, _, LD}, {LH, LM, _}} = calendar:now_to_local_time(Timestamp),
     {{_, _, UD}, {UH, UM, _}} = calendar:now_to_universal_time(Timestamp),
     if
-        LD - UD == 0 -> (LH - UH) * 60 + LM - UM;
-        LD - UD > 0 -> (23 - UH) * 60 + (60 - UM) + LH * 60 + LM;
-        LD - UD < 0 -> -((23 - LH) * 60 + (60 - LM) + UH * 60 + UM)
+        LD == UD -> (LH - UH) * 60 + LM - UM;
+        LD > UD -> (23 - UH) * 60 + (60 - UM) + LH * 60 + LM;
+        LD < UD -> -((23 - LH) * 60 + (60 - LM) + UH * 60 + UM)
     end.
 
 local_timezone() ->

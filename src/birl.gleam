@@ -831,13 +831,10 @@ pub fn compare(a: Time, b: Time) -> order.Order {
     _ -> #(wta, wtb)
   }
 
-  case ta == tb {
-    True -> order.Eq
-    False ->
-      case ta < tb {
-        True -> order.Lt
-        False -> order.Gt
-      }
+  case #(ta == tb, ta < tb) {
+    #(True, _) -> order.Eq
+    #(_, True) -> order.Lt
+    #(_, False) -> order.Gt
   }
 }
 
@@ -1161,9 +1158,7 @@ pub fn get_time_of_day(value: Time) -> TimeOfDay {
 
 @target(erlang)
 /// calculates erlang datetime using the offset in the DateTime value
-pub fn to_erlang_datetime(
-  value: Time,
-) -> #(#(Int, Int, Int), #(Int, Int, Int)) {
+pub fn to_erlang_datetime(value: Time) -> #(#(Int, Int, Int), #(Int, Int, Int)) {
   let #(date, #(hour, minute, second, _), _) = to_parts(value)
   #(date, #(hour, minute, second))
 }

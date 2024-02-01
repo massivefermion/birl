@@ -1,6 +1,7 @@
 import gleam/int
 import gleam/bool
 import gleam/list
+import gleam/order
 import gleam/regex
 import gleam/string
 import gleam/option
@@ -34,6 +35,14 @@ pub fn subtract(a: Duration, b: Duration) -> Duration {
   Duration(a - b)
 }
 
+pub fn micro_seconds(value: Int) -> Duration {
+  Duration(value)
+}
+
+pub fn milli_seconds(value: Int) -> Duration {
+  Duration(value * milli_second)
+}
+
 pub fn seconds(value: Int) -> Duration {
   Duration(value * second)
 }
@@ -60,6 +69,17 @@ pub fn months(value: Int) -> Duration {
 
 pub fn years(value: Int) -> Duration {
   Duration(value * year)
+}
+
+pub fn compare(a: Duration, b: Duration) -> order.Order {
+  let Duration(dta) = a
+  let Duration(dtb) = b
+
+  case #(dta == dtb, dta < dtb) {
+    #(True, _) -> order.Eq
+    #(_, True) -> order.Lt
+    #(_, False) -> order.Gt
+  }
 }
 
 /// use this if you need short durations where a year just means 365 days and a month just means 30 days
