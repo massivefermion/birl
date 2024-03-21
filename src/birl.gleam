@@ -68,15 +68,12 @@ pub fn now() -> Time {
     now,
     offset_in_minutes * 60_000_000,
     option.map(timezone, fn(tz) {
-      case
-        zones.list
-        |> list.any(fn(item) { item.0 == tz })
-      {
-        True -> option.Some(tz)
-        False -> option.None
-      }
-    })
-    |> option.flatten,
+        case list.any(zones.list, fn(item) { item.0 == tz }) {
+          True -> option.Some(tz)
+          False -> option.None
+        }
+      })
+      |> option.flatten,
     option.Some(monotonic_now),
   )
 }
@@ -102,10 +99,7 @@ pub fn now_with_offset(offset: String) -> Result(Time, Nil) {
 }
 
 pub fn now_with_timezone(timezone: String) -> Result(Time, Nil) {
-  case
-    zones.list
-    |> list.key_find(timezone)
-  {
+  case list.key_find(zones.list, timezone) {
     Ok(offset) -> {
       let now = ffi_now()
       let monotonic_now = ffi_monotonic_now()
@@ -284,7 +278,11 @@ pub fn to_iso8601(value: Time) -> String {
 /// 
 ///   - `19051222T16:38-3` -> `1905-12-22T16:38:00.000-03:00`
 /// 
+///   - `2019-03-26 14:30:00.9Z` -> `2019-03-26T14:30:00.900Z`
+/// 
 ///   - `2019-03-26T14:00:00.9Z` -> `2019-03-26T14:00:00.900Z`
+/// 
+///   - `1905-12-22 16:38:23-3` -> `1905-12-22T16:38:23.000-03:00`
 /// 
 ///   - `2019-03-26T14:00:00,4999Z` -> `2019-03-26T14:00:00.499Z`
 /// 
@@ -296,12 +294,15 @@ pub fn parse(value: String) -> Result(Time, Nil) {
   let value = string.trim(value)
 
   use #(day_string, offsetted_time_string) <- result.then(case
-    [string.split(value, "T"), string.split(value, "t")]
+    string.split(value, "T"),
+    string.split(value, "t"),
+    string.split(value, " ")
   {
-    [[day_string, time_string], _] | [_, [day_string, time_string]] ->
-      Ok(#(day_string, time_string))
-    [[_], [_]] -> Ok(#(value, "00"))
-    _ -> Error(Nil)
+    [day_string, time_string], _, _
+    | _, [day_string, time_string], _
+    | _, _, [day_string, time_string] -> Ok(#(day_string, time_string))
+    [_], [_], [_] -> Ok(#(value, "00"))
+    _, _, _ -> Error(Nil)
   })
 
   let day_string = string.trim(day_string)
@@ -332,23 +333,24 @@ pub fn parse(value: String) -> Result(Time, Nil) {
 
   let time_string = string.replace(time_string, ":", "")
   use #(time_string, milli_seconds_result) <- result.then(case
-    [string.split(time_string, "."), string.split(time_string, ",")]
+    string.split(time_string, "."),
+    string.split(time_string, ",")
   {
-    [[_], [_]] -> {
+    [_], [_] -> {
       Ok(#(time_string, Ok(0)))
     }
-    [[time_string, milli_seconds_string], [_]]
-    | [[_], [time_string, milli_seconds_string]] -> {
+    [time_string, milli_seconds_string], [_]
+    | [_], [time_string, milli_seconds_string] -> {
       Ok(#(
         time_string,
         milli_seconds_string
-        |> string.slice(0, 3)
-        |> string.pad_right(3, "0")
-        |> int.parse,
+          |> string.slice(0, 3)
+          |> string.pad_right(3, "0")
+          |> int.parse,
       ))
     }
 
-    _ -> Error(Nil)
+    _, _ -> Error(Nil)
   })
 
   case milli_seconds_result {
@@ -392,10 +394,11 @@ pub fn parse_time_of_day(value: String) -> Result(#(TimeOfDay, String), Nil) {
   let assert Ok(offset_pattern) = regex.from_string("(.*)([+|\\-].*)")
 
   let time_string = case
-    [string.starts_with(value, "T"), string.starts_with(value, "t")]
+    string.starts_with(value, "T"),
+    string.starts_with(value, "t")
   {
-    [True, _] | [_, True] -> string.drop_left(value, 1)
-    _ -> value
+    True, _ | _, True -> string.drop_left(value, 1)
+    _, _ -> value
   }
 
   use #(time_string, offset_string) <- result.then(case
@@ -414,23 +417,23 @@ pub fn parse_time_of_day(value: String) -> Result(#(TimeOfDay, String), Nil) {
   let time_string = string.replace(time_string, ":", "")
 
   use #(time_string, milli_seconds_result) <- result.then(case
-    [string.split(time_string, "."), string.split(time_string, ",")]
+    string.split(time_string, "."),
+    string.split(time_string, ",")
   {
-    [[_], [_]] -> {
+    [_], [_] -> {
       Ok(#(time_string, Ok(0)))
     }
-    [[time_string, milli_seconds_string], [_]]
-    | [[_], [time_string, milli_seconds_string]] -> {
+    [time_string, milli_seconds_string], [_]
+    | [_], [time_string, milli_seconds_string] -> {
       Ok(#(
         time_string,
         milli_seconds_string
-        |> string.slice(0, 3)
-        |> string.pad_right(3, "0")
-        |> int.parse,
+          |> string.slice(0, 3)
+          |> string.pad_right(3, "0")
+          |> int.parse,
       ))
     }
-
-    _ -> Error(Nil)
+    _, _ -> Error(Nil)
   })
 
   case milli_seconds_result {
@@ -452,32 +455,33 @@ pub fn parse_naive_time_of_day(
   value: String,
 ) -> Result(#(TimeOfDay, String), Nil) {
   let time_string = case
-    [string.starts_with(value, "T"), string.starts_with(value, "t")]
+    string.starts_with(value, "T"),
+    string.starts_with(value, "t")
   {
-    [True, _] | [_, True] -> string.drop_left(value, 1)
-    _ -> value
+    True, _ | _, True -> string.drop_left(value, 1)
+    _, _ -> value
   }
 
   let time_string = string.replace(time_string, ":", "")
 
   use #(time_string, milli_seconds_result) <- result.then(case
-    [string.split(time_string, "."), string.split(time_string, ",")]
+    string.split(time_string, "."),
+    string.split(time_string, ",")
   {
-    [[_], [_]] -> {
+    [_], [_] -> {
       Ok(#(time_string, Ok(0)))
     }
-    [[time_string, milli_seconds_string], [_]]
-    | [[_], [time_string, milli_seconds_string]] -> {
+    [time_string, milli_seconds_string], [_]
+    | [_], [time_string, milli_seconds_string] -> {
       Ok(#(
         time_string,
         milli_seconds_string
-        |> string.slice(0, 3)
-        |> string.pad_right(3, "0")
-        |> int.parse,
+          |> string.slice(0, 3)
+          |> string.pad_right(3, "0")
+          |> int.parse,
       ))
     }
-
-    _ -> Error(Nil)
+    _, _ -> Error(Nil)
   })
 
   case milli_seconds_result {
@@ -540,12 +544,15 @@ pub fn from_naive(value: String) -> Result(Time, Nil) {
   let value = string.trim(value)
 
   use #(day_string, time_string) <- result.then(case
-    [string.split(value, "T"), string.split(value, "t")]
+    string.split(value, "T"),
+    string.split(value, "t"),
+    string.split(value, " ")
   {
-    [[day_string, time_string], [_]] | [[_], [day_string, time_string]] ->
-      Ok(#(day_string, time_string))
-    [[_], [_]] -> Ok(#(value, "00"))
-    _ -> Error(Nil)
+    [day_string, time_string], _, _
+    | _, [day_string, time_string], _
+    | _, _, [day_string, time_string] -> Ok(#(day_string, time_string))
+    [_], [_], [_] -> Ok(#(value, "00"))
+    _, _, _ -> Error(Nil)
   })
 
   let day_string = string.trim(day_string)
@@ -561,9 +568,9 @@ pub fn from_naive(value: String) -> Result(Time, Nil) {
       Ok(#(
         time_string,
         milli_seconds_string
-        |> string.slice(0, 3)
-        |> string.pad_right(3, "0")
-        |> int.parse,
+          |> string.slice(0, 3)
+          |> string.pad_right(3, "0")
+          |> int.parse,
       ))
 
     _ -> Error(Nil)
@@ -702,26 +709,18 @@ pub fn from_http(value: String) -> Result(Time, Nil) {
     [day_string, month_string, year_string, time_string, offset_string] -> {
       let time_string = string.replace(time_string, ":", "")
       case
-        #(
-          int.parse(day_string),
-          month_strings
-          |> list.index_map(fn(month, index) {
-            let strings = month.1
-            #(index, strings.0, strings.1)
-          })
-          |> list.find(fn(month) {
-            month.1 == month_string || month.2 == month_string
-          }),
-          int.parse(year_string),
-          parse_time_section(time_string),
-        )
+        int.parse(day_string),
+        list.index_map(month_strings, fn(month, index) {
+          let strings = month.1
+          #(index, strings.0, strings.1)
+        })
+        |> list.find(fn(month) {
+          month.1 == month_string || month.2 == month_string
+        }),
+        int.parse(year_string),
+        parse_time_section(time_string)
       {
-        #(
-          Ok(day),
-          Ok(#(month_index, _, _)),
-          Ok(year),
-          Ok([hour, minute, second]),
-        ) ->
+        Ok(day), Ok(#(month_index, _, _)), Ok(year), Ok([hour, minute, second]) ->
           case
             from_parts(
               #(year, month_index + 1, day),
@@ -745,7 +744,7 @@ pub fn from_http(value: String) -> Result(Time, Nil) {
             }
             Error(Nil) -> Error(Nil)
           }
-        _ -> Error(Nil)
+        _, _, _, _ -> Error(Nil)
       }
     }
 
@@ -754,26 +753,22 @@ pub fn from_http(value: String) -> Result(Time, Nil) {
         [day_string, month_string, year_string] -> {
           let time_string = string.replace(time_string, ":", "")
           case
-            #(
-              int.parse(day_string),
-              month_strings
-              |> list.index_map(fn(month, index) {
-                let strings = month.1
-                #(index, strings.0, strings.1)
-              })
-              |> list.find(fn(month) {
-                month.1 == month_string || month.2 == month_string
-              }),
-              int.parse(year_string),
-              parse_time_section(time_string),
-            )
+            int.parse(day_string),
+            list.index_map(month_strings, fn(month, index) {
+              let strings = month.1
+              #(index, strings.0, strings.1)
+            })
+            |> list.find(fn(month) {
+              month.1 == month_string || month.2 == month_string
+            }),
+            int.parse(year_string),
+            parse_time_section(time_string)
           {
-            #(
-              Ok(day),
-              Ok(#(month_index, _, _)),
-              Ok(year),
-              Ok([hour, minute, second]),
-            ) ->
+            Ok(day), Ok(#(month_index, _, _)), Ok(year), Ok([
+              hour,
+              minute,
+              second,
+            ]) ->
               case
                 from_parts(
                   #(year, month_index + 1, day),
@@ -800,12 +795,11 @@ pub fn from_http(value: String) -> Result(Time, Nil) {
                 }
                 Error(Nil) -> Error(Nil)
               }
-            _ -> Error(Nil)
+            _, _, _, _ -> Error(Nil)
           }
         }
         _ -> Error(Nil)
       }
-
     _ -> Error(Nil)
   }
 }
@@ -826,15 +820,15 @@ pub fn compare(a: Time, b: Time) -> order.Order {
   let Time(wall_time: wta, offset: _, timezone: _, monotonic_time: mta) = a
   let Time(wall_time: wtb, offset: _, timezone: _, monotonic_time: mtb) = b
 
-  let #(ta, tb) = case #(mta, mtb) {
-    #(option.Some(ta), option.Some(tb)) -> #(ta, tb)
-    _ -> #(wta, wtb)
+  let #(ta, tb) = case mta, mtb {
+    option.Some(ta), option.Some(tb) -> #(ta, tb)
+    _, _ -> #(wta, wtb)
   }
 
-  case #(ta == tb, ta < tb) {
-    #(True, _) -> order.Eq
-    #(_, True) -> order.Lt
-    #(_, False) -> order.Gt
+  case ta == tb, ta < tb {
+    True, _ -> order.Eq
+    _, True -> order.Lt
+    _, False -> order.Gt
   }
 }
 
@@ -842,9 +836,9 @@ pub fn difference(a: Time, b: Time) -> duration.Duration {
   let Time(wall_time: wta, offset: _, timezone: _, monotonic_time: mta) = a
   let Time(wall_time: wtb, offset: _, timezone: _, monotonic_time: mtb) = b
 
-  let #(ta, tb) = case #(mta, mtb) {
-    #(option.Some(ta), option.Some(tb)) -> #(ta, tb)
-    _ -> #(wta, wtb)
+  let #(ta, tb) = case mta, mtb {
+    option.Some(ta), option.Some(tb) -> #(ta, tb)
+    _, _ -> #(wta, wtb)
   }
 
   duration.Duration(ta - tb)
@@ -1090,10 +1084,7 @@ pub fn range(
 }
 
 pub fn set_timezone(value: Time, new_timezone: String) -> Result(Time, Nil) {
-  case
-    zones.list
-    |> list.key_find(new_timezone)
-  {
+  case list.key_find(zones.list, new_timezone) {
     Ok(new_offset_number) -> {
       case value {
         Time(wall_time: t, offset: _, timezone: _, monotonic_time: mt) ->
@@ -1192,15 +1183,12 @@ pub fn from_erlang_local_datetime(
     wall_time,
     offset_in_minutes * 60_000_000,
     option.map(timezone, fn(tz) {
-      case
-        zones.list
-        |> list.any(fn(item) { item.0 == tz })
-      {
-        True -> option.Some(tz)
-        False -> option.None
-      }
-    })
-    |> option.flatten,
+        case list.any(zones.list, fn(item) { item.0 == tz }) {
+          True -> option.Some(tz)
+          False -> option.None
+        }
+      })
+      |> option.flatten,
     option.None,
   )
 }
@@ -1305,22 +1293,22 @@ fn generate_offset(offset: Int) -> Result(String, Nil) {
             string.concat([
               "+",
               hour
-              |> int.to_string
-              |> string.pad_left(2, "0"),
+                |> int.to_string
+                |> string.pad_left(2, "0"),
             ])
           False ->
             string.concat([
               "-",
               hour
-              |> int.absolute_value
-              |> int.to_string
-              |> string.pad_left(2, "0"),
+                |> int.absolute_value
+                |> int.to_string
+                |> string.pad_left(2, "0"),
             ])
         },
         minute
-        |> int.absolute_value
-        |> int.to_string
-        |> string.pad_left(2, "0"),
+          |> int.absolute_value
+          |> int.to_string
+          |> string.pad_left(2, "0"),
       ]
       |> string.join(":")
       |> Ok
@@ -1332,16 +1320,16 @@ fn generate_offset(offset: Int) -> Result(String, Nil) {
             string.concat([
               "+",
               hour
-              |> int.to_string
-              |> string.pad_left(2, "0"),
+                |> int.to_string
+                |> string.pad_left(2, "0"),
             ])
           False ->
             string.concat([
               "-",
               hour
-              |> int.absolute_value
-              |> int.to_string
-              |> string.pad_left(2, "0"),
+                |> int.absolute_value
+                |> int.to_string
+                |> string.pad_left(2, "0"),
             ])
         },
         "00",

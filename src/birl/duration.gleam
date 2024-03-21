@@ -35,6 +35,16 @@ pub fn subtract(a: Duration, b: Duration) -> Duration {
   Duration(a - b)
 }
 
+pub fn scale_up(value: Duration, factor: Int) -> Duration {
+  let Duration(value) = value
+  Duration(value * factor)
+}
+
+pub fn scale_down(value: Duration, factor: Int) -> Duration {
+  let Duration(value) = value
+  Duration(value / factor)
+}
+
 pub fn micro_seconds(value: Int) -> Duration {
   Duration(value)
 }
@@ -75,10 +85,10 @@ pub fn compare(a: Duration, b: Duration) -> order.Order {
   let Duration(dta) = a
   let Duration(dtb) = b
 
-  case #(dta == dtb, dta < dtb) {
-    #(True, _) -> order.Eq
-    #(_, True) -> order.Lt
-    #(_, False) -> order.Gt
+  case dta == dtb, dta < dtb {
+    True, _ -> order.Eq
+    _, True -> order.Lt
+    _, False -> order.Gt
   }
 }
 

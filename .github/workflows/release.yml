@@ -1,0 +1,34 @@
+name: release
+
+on:
+  push:
+    tags: ['v*']
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+      - uses: erlef/setup-beam@v1
+        with:
+          otp-version: '26'
+          gleam-version: '1.0'
+
+      - run: |
+          version="v$(cat gleam.toml | grep -m 1 "version" | sed -r "s/version *= *\"([[:digit:].]+)\"/\1/")"
+          if [ "$version" != "${{ github.ref_name }}" ]; then
+            echo "tag '${{ github.ref_name }}' does not match the version in gleam.toml"
+            echo "expected a tag name 'v$version'"
+            exit 1
+          fi
+        name: check version
+
+      - run: gleam format --check
+
+      - run: gleam test
+
+      - run: gleam publish -y
+        env:
+          HEXPM_USER: ${{ secrets.HEXPM_USER }}
+          HEXPM_PASS: ${{ secrets.HEXPM_PASS }}

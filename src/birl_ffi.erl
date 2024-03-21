@@ -72,19 +72,6 @@ local_timezone() ->
             end
     end.
 
-local_timezone_from_etc() ->
-    case file:read_file("/etc/timezone") of
-        {ok, NewLinedTimezone} ->
-            {some, string:trim(NewLinedTimezone)};
-        {error, _} ->
-            case file:read_link("/etc/localtime") of
-                {ok, Path} ->
-                    {some, timezone_from_path(Path)};
-                {error, _} ->
-                    none
-            end
-    end.
-
 monotonic_now() ->
     StartTime = erlang:system_info(start_time),
     CurrentTime = erlang:monotonic_time(),
@@ -118,6 +105,19 @@ from_parts(Parts, Offset) ->
 weekday(Timestamp, Offset) ->
     {Date, _} = to_parts(Timestamp, Offset),
     calendar:day_of_the_week(Date) - 1.
+
+local_timezone_from_etc() ->
+    case file:read_file("/etc/timezone") of
+        {ok, NewLinedTimezone} ->
+            {some, string:trim(NewLinedTimezone)};
+        {error, _} ->
+            case file:read_link("/etc/localtime") of
+                {ok, Path} ->
+                    {some, timezone_from_path(Path)};
+                {error, _} ->
+                    none
+            end
+    end.
 
 timezone_from_path(Path) ->
     Split = string:split(Path, "/", all),
