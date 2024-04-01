@@ -4,10 +4,10 @@
 packages = [
   { name = "gleam_stdlib", version = "0.36.0", build_tools = ["gleam"], requirements = [], otp_app = "gleam_stdlib", source = "hex", outer_checksum = "C0D14D807FEC6F8A08A7C9EF8DFDE6AE5C10E40E21325B2B29365965D82EB3D4" },
   { name = "gleeunit", version = "1.0.2", build_tools = ["gleam"], requirements = ["gleam_stdlib"], otp_app = "gleeunit", source = "hex", outer_checksum = "D364C87AFEB26BDB4FB8A5ABDE67D635DC9FA52D6AB68416044C35B096C6882D" },
-  { name = "ranger", version = "1.1.0", build_tools = ["gleam"], requirements = ["gleam_stdlib"], otp_app = "ranger", source = "hex", outer_checksum = "28E615AE7590ED922AF1510DDF606A2ECBBC2A9609AF36D412EDC925F06DFD20" },
+  { name = "ranger", version = "1.2.0", build_tools = ["gleam"], requirements = ["gleam_stdlib"], otp_app = "ranger", source = "hex", outer_checksum = "1566C272B1D141B3BBA38B25CB761EF56E312E79EC0E2DFD4D3C19FB0CC1F98C" },
 ]
 
 [requirements]
 gleam_stdlib = { version = "~> 0.36 or ~> 1.0" }
 gleeunit = { version = "~> 1.0" }
-ranger = { version = "~> 1.1" }
+ranger = { version = "~> 1.2" }

@@ -34,12 +34,15 @@ now() -> os:system_time(microsecond).
 
 local_offset() ->
     Timestamp = erlang:timestamp(),
-    {{LY, LN, LD}, {LH, LM, _}} = calendar:now_to_local_time(Timestamp),
-    {{UY, UN, UD}, {UH, UM, _}} = calendar:now_to_universal_time(Timestamp),
+    {{_, LMo, LD}, {LH, LM, _}} = calendar:now_to_local_time(Timestamp),
+    {{_, UMo, UD}, {UH, UM, _}} = calendar:now_to_universal_time(Timestamp),
     if
-        LD == UD -> (LH - UH) * 60 + LM - UM;
-        LD > UD orelse LN > UN orelse LY > UY -> (23 - UH) * 60 + (60 - UM) + LH * 60 + LM; 
-        LD < UD -> -((23 - LH) * 60 + (60 - LM) + UH * 60 + UM)
+        LD == UD ->
+            (LH - UH) * 60 + LM - UM;
+        LD > UD andalso LMo == UMo ->
+            (23 - UH) * 60 + (60 - UM) + LH * 60 + LM;
+        true ->
+            -((23 - LH) * 60 + (60 - LM) + UH * 60 + UM)
     end.
 
 local_timezone() ->
