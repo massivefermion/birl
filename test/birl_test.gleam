@@ -1,8 +1,9 @@
-import gleam/order
-import gleeunit
-import gleeunit/should
 import birl
 import birl/duration
+import gleam/order
+import gleam/result
+import gleeunit
+import gleeunit/should
 
 const iso_datetime = "1905-12-22T16:38:23.000+03:30"
 
@@ -184,4 +185,11 @@ pub fn weird_value8_test() {
   |> should.be_ok
   |> birl.to_naive
   |> should.equal("2019-03-26T14:00:00.020")
+}
+
+pub fn weird_value9_test() {
+  "2019-03-26"
+  |> birl.parse
+  |> result.map(birl.get_day)
+  |> should.equal(Ok(birl.Day(2019, 3, 26)))
 }
