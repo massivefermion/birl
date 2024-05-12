@@ -1,5 +1,4 @@
 import gleam/int
-import gleam/bool
 import gleam/list
 import gleam/order
 import gleam/regex
@@ -258,17 +257,7 @@ const unit_values = [
 ]
 
 fn inner_blur(values: List(#(Int, Unit))) -> #(Int, Unit) {
-  let assert Ok(second) = case values {
-    [second, ..] -> Ok(second)
-    _ -> Error(Nil)
-  }
-  let leading = case values {
-    [_, leading, ..] -> Ok(leading)
-    _ -> Error(Nil)
-  }
-  use <- bool.guard(result.is_error(leading), second)
-  let assert [leading] = result.values([leading])
-
+  let assert [second, leading, ..] = values
   let assert Ok(leading_unit) = list.key_find(unit_values, leading.1)
   let assert Ok(second_unit) = list.key_find(unit_values, second.1)
 
