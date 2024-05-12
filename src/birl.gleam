@@ -984,7 +984,7 @@ pub fn subtract(value: Time, duration: duration.Duration) -> Time {
 pub fn weekday(value: Time) -> Weekday {
   case value {
     Time(wall_time: t, offset: o, timezone: _, monotonic_time: _) -> {
-      let assert Ok(weekday) = list.at(weekdays, ffi_weekday(t, o))
+      let assert Ok(weekday) = weekday_from_int(ffi_weekday(t, o))
       weekday
     }
   }
@@ -1016,7 +1016,7 @@ pub fn short_string_weekday(value: Time) -> String {
 
 pub fn month(value: Time) -> Month {
   let #(#(_, month, _), _, _) = to_parts(value)
-  let assert Ok(month) = list.at(months, month - 1)
+  let assert Ok(month) = month_from_int(month)
   month
 }
 
@@ -1451,12 +1451,50 @@ fn parse_section(
 }
 
 @target(erlang)
-const weekdays = [Mon, Tue, Wed, Thu, Fri, Sat, Sun]
+fn weekday_from_int(weekday: Int) -> Result(Weekday, Nil) {
+  case weekday {
+    0 -> Ok(Mon)
+    1 -> Ok(Tue)
+    2 -> Ok(Wed)
+    3 -> Ok(Thu)
+    4 -> Ok(Fri)
+    5 -> Ok(Sat)
+    6 -> Ok(Sun)
+    _ -> Error(Nil)
+  }
+}
 
 @target(javascript)
-const weekdays = [Sun, Mon, Tue, Wed, Thu, Fri, Sat]
+fn weekday_from_int(weekday: Int) -> Result(Weekday, Nil) {
+  case weekday {
+    0 -> Ok(Sun)
+    1 -> Ok(Mon)
+    2 -> Ok(Tue)
+    3 -> Ok(Wed)
+    4 -> Ok(Thu)
+    5 -> Ok(Fri)
+    6 -> Ok(Sat)
+    _ -> Error(Nil)
+  }
+}
 
-const months = [Jan, Feb, Mar, Apr, May, Jun, Jul, Aug, Sep, Oct, Nov, Dec]
+fn month_from_int(month: Int) -> Result(Month, Nil) {
+  case month {
+    1 -> Ok(Jan)
+    2 -> Ok(Feb)
+    3 -> Ok(Mar)
+    4 -> Ok(Apr)
+    5 -> Ok(May)
+    6 -> Ok(Jun)
+    7 -> Ok(Jul)
+    8 -> Ok(Aug)
+    9 -> Ok(Sep)
+    10 -> Ok(Oct)
+    11 -> Ok(Nov)
+    12 -> Ok(Dec)
+    _ -> Error(Nil)
+  }
+}
 
 const weekday_strings = [
   #(Mon, #("Monday", "Mon")),
