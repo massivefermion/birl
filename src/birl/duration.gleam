@@ -1,11 +1,11 @@
-import gleam/bool
 import gleam/int
+import gleam/bool
 import gleam/list
-import gleam/option
 import gleam/order
 import gleam/regex
-import gleam/result
 import gleam/string
+import gleam/option
+import gleam/result
 
 pub type Duration {
   Duration(Int)

@@ -1,8 +1,8 @@
+import gleam/list
+import gleam/order
+import gleam/option
 import birl
 import birl/duration
-import gleam/list
-import gleam/option
-import gleam/order
 
 pub opaque type Interval {
   Interval(start: birl.Time, end: birl.Time)
