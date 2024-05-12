@@ -258,9 +258,9 @@ const unit_values = [
 ]
 
 fn inner_blur(values: List(#(Int, Unit))) -> #(Int, Unit) {
-  let second = case values {
-    [second, ..] -> second
-    _ -> panic
+  let assert Ok(second) = case values {
+    [second, ..] -> Ok(second)
+    _ -> Error(Nil)
   }
   let leading = case values {
     [_, leading, ..] -> Ok(leading)
