@@ -258,8 +258,14 @@ const unit_values = [
 ]
 
 fn inner_blur(values: List(#(Int, Unit))) -> #(Int, Unit) {
-  let assert Ok(second) = list.at(values, 0)
-  let leading = list.at(values, 1)
+  let second = case values {
+    [second, ..] -> second
+    _ -> panic
+  }
+  let leading = case values {
+    [_, leading, ..] -> Ok(leading)
+    _ -> Error(Nil)
+  }
   use <- bool.guard(result.is_error(leading), second)
   let assert [leading] = result.values([leading])
 
