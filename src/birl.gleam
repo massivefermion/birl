@@ -1,15 +1,15 @@
-import gleam/int
-import gleam/list
+import birl/duration
+import birl/zones
 import gleam/bool
+import gleam/function
+import gleam/int
+import gleam/iterator
+import gleam/list
+import gleam/option
 import gleam/order
 import gleam/regex
-import gleam/string
-import gleam/option
 import gleam/result
-import gleam/iterator
-import gleam/function
-import birl/zones
-import birl/duration
+import gleam/string
 import ranger
 
 pub opaque type Time {
@@ -68,11 +68,11 @@ pub fn now() -> Time {
     now,
     offset_in_minutes * 60_000_000,
     option.map(timezone, fn(tz) {
-        case list.any(zones.list, fn(item) { item.0 == tz }) {
-          True -> option.Some(tz)
-          False -> option.None
-        }
-      })
+      case list.any(zones.list, fn(item) { item.0 == tz }) {
+        True -> option.Some(tz)
+        False -> option.None
+      }
+    })
       |> option.flatten,
     option.Some(monotonic_now),
   )
@@ -263,31 +263,31 @@ pub fn to_iso8601(value: Time) -> String {
 }
 
 /// if you need to parse an `ISO8601` string, this is probably what you're looking for.
-/// 
+///
 /// given the huge surface area that `ISO8601` covers, it does not make sense for `birl`
 /// to support all of it in one function, so this function parses only strings for which both
 /// day and time of day can be extracted or deduced. Some acceptable examples are given below:
-/// 
+///
 ///   - `2019t14-4` -> `2019-01-01T14:00:00.000-04:00`
-/// 
+///
 ///   - `2019-03-26t14:00.9z` -> `2019-03-26T14:00:00.900Z`
-/// 
+///
 ///   - `2019-03-26+330` -> `2019-03-26T00:00:00.000+03:30`
-/// 
+///
 ///   - `20190326t1400-4` -> `2019-03-26T14:00:00.000-04:00`
-/// 
+///
 ///   - `19051222T16:38-3` -> `1905-12-22T16:38:00.000-03:00`
-/// 
+///
 ///   - `2019-03-26 14:30:00.9Z` -> `2019-03-26T14:30:00.900Z`
-/// 
+///
 ///   - `2019-03-26T14:00:00.9Z` -> `2019-03-26T14:00:00.900Z`
-/// 
+///
 ///   - `1905-12-22 16:38:23-3` -> `1905-12-22T16:38:23.000-03:00`
-/// 
+///
 ///   - `2019-03-26T14:00:00,4999Z` -> `2019-03-26T14:00:00.499Z`
-/// 
+///
 ///   - `1905-12-22T163823+0330` -> `1905-12-22T16:38:23.000+03:30`
-/// 
+///
 ///   - `1905-12-22T16:38:23.000+03:30` -> `1905-12-22T16:38:23.000+03:30`
 pub fn parse(value: String) -> Result(Time, Nil) {
   let assert Ok(offset_pattern) = regex.from_string("(.*)([+|\\-].*)")
@@ -300,7 +300,8 @@ pub fn parse(value: String) -> Result(Time, Nil) {
   {
     [day_string, time_string], _, _
     | _, [day_string, time_string], _
-    | _, _, [day_string, time_string] -> Ok(#(day_string, time_string))
+    | _, _, [day_string, time_string]
+    -> Ok(#(day_string, time_string))
     [_], [_], [_] -> Ok(#(value, "00"))
     _, _, _ -> Error(Nil)
   })
@@ -378,17 +379,17 @@ pub fn parse(value: String) -> Result(Time, Nil) {
 /// in the string. Some acceptable examples are given below:
 ///
 ///   - `t25z` -> `#(TimeOfDay(2, 5, 0, 0), "Z")`
-/// 
+///
 ///   - `14-4` -> `#(TimeOfDay(14, 0, 0, 0), "-04:00")`
-/// 
+///
 ///   - `T145+4` -> `#(TimeOfDay(14, 5, 0, 0), "+04:00")`
-/// 
+///
 ///   - `16:38-3` -> `#(TimeOfDay(16, 38, 0, 0), "-03:00")`
-/// 
+///
 ///   - `t14:65.9z` -> `#(TimeOfDay(14, 6, 5, 900), "-04:00")`
-/// 
+///
 ///   - `163823+0330` -> `#(TimeOfDay(16, 38, 23, 0), "+03:30")`
-/// 
+///
 ///   - `T16:38:23.050+03:30` -> `#(TimeOfDay(16, 38, 23, 50), "+03:30")`
 pub fn parse_time_of_day(value: String) -> Result(#(TimeOfDay, String), Nil) {
   let assert Ok(offset_pattern) = regex.from_string("(.*)([+|\\-].*)")
@@ -550,7 +551,8 @@ pub fn from_naive(value: String) -> Result(Time, Nil) {
   {
     [day_string, time_string], _, _
     | _, [day_string, time_string], _
-    | _, _, [day_string, time_string] -> Ok(#(day_string, time_string))
+    | _, _, [day_string, time_string]
+    -> Ok(#(day_string, time_string))
     [_], [_], [_] -> Ok(#(value, "00"))
     _, _, _ -> Error(Nil)
   })
@@ -764,11 +766,11 @@ pub fn from_http(value: String) -> Result(Time, Nil) {
             int.parse(year_string),
             parse_time_section(time_string)
           {
-            Ok(day), Ok(#(month_index, _, _)), Ok(year), Ok([
-              hour,
-              minute,
-              second,
-            ]) ->
+            Ok(day),
+              Ok(#(month_index, _, _)),
+              Ok(year),
+              Ok([hour, minute, second])
+            ->
               case
                 from_parts(
                   #(year, month_index + 1, day),
@@ -855,7 +857,7 @@ const string_to_units = [
 ]
 
 /// you could say this is the opposite of `legible_difference`
-/// 
+///
 /// ```gleam
 /// > parse_relative(birl.now(), "8 minutes ago")
 /// ```
@@ -1183,11 +1185,11 @@ pub fn from_erlang_local_datetime(
     wall_time,
     offset_in_minutes * 60_000_000,
     option.map(timezone, fn(tz) {
-        case list.any(zones.list, fn(item) { item.0 == tz }) {
-          True -> option.Some(tz)
-          False -> option.None
-        }
-      })
+      case list.any(zones.list, fn(item) { item.0 == tz }) {
+        True -> option.Some(tz)
+        False -> option.None
+      }
+    })
       |> option.flatten,
     option.None,
   )

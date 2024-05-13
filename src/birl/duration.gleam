@@ -1,10 +1,10 @@
 import gleam/int
 import gleam/list
+import gleam/option
 import gleam/order
 import gleam/regex
-import gleam/string
-import gleam/option
 import gleam/result
+import gleam/string
 
 pub type Duration {
   Duration(Int)
@@ -196,11 +196,11 @@ pub fn accurate_decompose(duration: Duration) -> List(#(Int, Unit)) {
 }
 
 /// approximates the duration by only the given unit
-/// 
+///
 /// if the duration is not an integer multiple of the unit,
 /// the remainder will be disgarded if it's less than two thirds of the unit,
 /// otherwise a single unit will be added to the multiplier.
-/// 
+///
 ///   - `blur_to(days(16), Month)` ->  `0`
 ///   - `blur_to(days(20), Month)` ->  `1`
 pub fn blur_to(duration: Duration, unit: Unit) -> Int {

@@ -1,8 +1,8 @@
+import birl
+import birl/duration
 import gleam/order
 import gleeunit
 import gleeunit/should
-import birl
-import birl/duration
 
 const iso_datetime = "1905-12-22T16:38:23.000+03:30"
 
