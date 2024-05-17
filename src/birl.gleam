@@ -495,6 +495,26 @@ pub fn parse_naive_time_of_day(
   }
 }
 
+pub fn time_of_day_to_string(value: TimeOfDay) -> String {
+  int.to_string(value.hour)
+  <> ":"
+  <> int.to_string(value.minute)
+  |> string.pad_left(2, "0")
+  <> ":"
+  <> int.to_string(value.second)
+  |> string.pad_left(2, "0")
+  <> "."
+  <> int.to_string(value.milli_second)
+  |> string.pad_left(3, "0")
+}
+
+pub fn time_of_day_to_short_string(value: TimeOfDay) -> String {
+  int.to_string(value.hour)
+  <> ":"
+  <> int.to_string(value.minute)
+  |> string.pad_left(2, "0")
+}
+
 /// the naive format is the same as ISO8601 except that it does not contain the offset
 pub fn to_naive(value: Time) -> String {
   let #(#(year, month, day), #(hour, minute, second, milli_second), _) =
@@ -991,7 +1011,17 @@ pub fn weekday(value: Time) -> Weekday {
 }
 
 pub fn string_weekday(value: Time) -> String {
-  case weekday(value) {
+  weekday(value)
+  |> weekday_to_string
+}
+
+pub fn short_string_weekday(value: Time) -> String {
+  weekday(value)
+  |> weekday_to_short_string
+}
+
+pub fn weekday_to_string(value: Weekday) -> String {
+  case value {
     Mon -> "Monday"
     Tue -> "Tuesday"
     Wed -> "Wednesday"
@@ -1002,8 +1032,8 @@ pub fn string_weekday(value: Time) -> String {
   }
 }
 
-pub fn short_string_weekday(value: Time) -> String {
-  case weekday(value) {
+pub fn weekday_to_short_string(value: Weekday) -> String {
+  case value {
     Mon -> "Mon"
     Tue -> "Tue"
     Wed -> "Wed"
@@ -1012,6 +1042,18 @@ pub fn short_string_weekday(value: Time) -> String {
     Sat -> "Sat"
     Sun -> "Sun"
   }
+}
+
+pub fn parse_weekday(value: String) -> Result(Weekday, Nil) {
+  let lowercase = string.lowercase(value)
+  let weekday =
+    list.find(weekday_strings, fn(weekday_string) {
+      let #(_, #(long, short)) = weekday_string
+      lowercase == string.lowercase(short)
+      || lowercase == string.lowercase(long)
+    })
+  weekday
+  |> result.map(fn(weekday) { weekday.0 })
 }
 
 pub fn month(value: Time) -> Month {
