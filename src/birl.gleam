@@ -816,6 +816,30 @@ pub fn from_unix(value: Int) -> Time {
   Time(value * 1_000_000, 0, option.None, option.None)
 }
 
+/// unix milli timestamps are the number of milliseconds that have elapsed since 00:00:00 UTC on January 1st, 1970
+pub fn to_unix_milli(value: Time) -> Int {
+  case value {
+    Time(t, _, _, _) -> t / 1_000
+  }
+}
+
+/// unix milli timestamps are the number of milliseconds that have elapsed since 00:00:00 UTC on January 1st, 1970
+pub fn from_unix_milli(value: Int) -> Time {
+  Time(value * 1_000, 0, option.None, option.None)
+}
+
+/// unix micro timestamps are the number of microseconds that have elapsed since 00:00:00 UTC on January 1st, 1970
+pub fn to_unix_micro(value: Time) -> Int {
+  case value {
+    Time(t, _, _, _) -> t
+  }
+}
+
+/// unix micro timestamps are the number of microseconds that have elapsed since 00:00:00 UTC on January 1st, 1970
+pub fn from_unix_micro(value: Int) -> Time {
+  Time(value, 0, option.None, option.None)
+}
+
 pub fn compare(a: Time, b: Time) -> order.Order {
   let Time(wall_time: wta, offset: _, timezone: _, monotonic_time: mta) = a
   let Time(wall_time: wtb, offset: _, timezone: _, monotonic_time: mtb) = b
