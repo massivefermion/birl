@@ -185,3 +185,58 @@ pub fn weird_value8_test() {
   |> birl.to_naive
   |> should.equal("2019-03-26T14:00:00.020")
 }
+
+pub fn time_of_day_to_string_test() {
+  birl.time_of_day_to_string(birl.TimeOfDay(8, 5, 9, 2))
+  |> should.equal("8:05:09.002")
+
+  birl.time_of_day_to_string(birl.TimeOfDay(16, 30, 20, 999))
+  |> should.equal("16:30:20.999")
+
+  birl.time_of_day_to_string(birl.TimeOfDay(0, 0, 0, 0))
+  |> should.equal("0:00:00.000")
+}
+
+pub fn time_of_day_to_short_string_test() {
+  birl.time_of_day_to_short_string(birl.TimeOfDay(8, 5, 9, 2))
+  |> should.equal("8:05")
+
+  birl.time_of_day_to_short_string(birl.TimeOfDay(16, 30, 20, 999))
+  |> should.equal("16:30")
+
+  birl.time_of_day_to_short_string(birl.TimeOfDay(0, 0, 0, 0))
+  |> should.equal("0:00")
+}
+
+pub fn parse_weekday_test() {
+  birl.parse_weekday("mon")
+  |> should.equal(Ok(birl.Mon))
+
+  birl.parse_weekday("tuesday")
+  |> should.equal(Ok(birl.Tue))
+
+  birl.parse_weekday("Wednesday")
+  |> should.equal(Ok(birl.Wed))
+
+  birl.parse_weekday("THU")
+  |> should.equal(Ok(birl.Thu))
+
+  birl.parse_weekday("not a weekday")
+  |> should.be_error
+}
+
+pub fn weekday_to_string_test() {
+  birl.weekday_to_string(birl.Fri)
+  |> should.equal("Friday")
+
+  birl.weekday_to_string(birl.Sat)
+  |> should.equal("Saturday")
+}
+
+pub fn weekday_to_short_string_test() {
+  birl.weekday_to_short_string(birl.Sun)
+  |> should.equal("Sun")
+
+  birl.weekday_to_short_string(birl.Mon)
+  |> should.equal("Mon")
+}
