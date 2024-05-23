@@ -839,13 +839,13 @@ pub fn from_unix(value: Int) -> Time {
 /// unix milli timestamps are the number of milliseconds that have elapsed since 00:00:00 UTC on January 1st, 1970
 pub fn to_unix_milli(value: Time) -> Int {
   case value {
-    Time(t, _, _, _) -> t / 1_000
+    Time(t, _, _, _) -> t / 1000
   }
 }
 
 /// unix milli timestamps are the number of milliseconds that have elapsed since 00:00:00 UTC on January 1st, 1970
 pub fn from_unix_milli(value: Int) -> Time {
-  Time(value * 1_000, 0, option.None, option.None)
+  Time(value * 1000, 0, option.None, option.None)
 }
 
 /// unix micro timestamps are the number of microseconds that have elapsed since 00:00:00 UTC on January 1st, 1970
