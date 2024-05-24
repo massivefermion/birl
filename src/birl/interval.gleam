@@ -1,6 +1,7 @@
 import gleam/list
-import gleam/order
 import gleam/option
+import gleam/order
+
 import birl
 import birl/duration
 

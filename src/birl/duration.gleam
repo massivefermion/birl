@@ -1,10 +1,10 @@
 import gleam/int
 import gleam/list
+import gleam/option
 import gleam/order
 import gleam/regex
-import gleam/string
-import gleam/option
 import gleam/result
+import gleam/string
 
 pub type Duration {
   Duration(Int)
@@ -245,14 +245,8 @@ const accurate_month = 2_629_746_000_000
 const accurate_year = 31_556_952_000_000
 
 const unit_values = [
-  #(Year, year),
-  #(Month, month),
-  #(Week, week),
-  #(Day, day),
-  #(Hour, hour),
-  #(Minute, minute),
-  #(Second, second),
-  #(MilliSecond, milli_second),
+  #(Year, year), #(Month, month), #(Week, week), #(Day, day), #(Hour, hour),
+  #(Minute, minute), #(Second, second), #(MilliSecond, milli_second),
   #(MicroSecond, 1),
 ]
 
@@ -292,14 +286,9 @@ const milli_second_units = [
 ]
 
 const units = [
-  #(Year, year_units),
-  #(Month, month_units),
-  #(Week, week_units),
-  #(Day, day_units),
-  #(Hour, hour_units),
-  #(Minute, minute_units),
-  #(Second, second_units),
-  #(MilliSecond, milli_second_units),
+  #(Year, year_units), #(Month, month_units), #(Week, week_units),
+  #(Day, day_units), #(Hour, hour_units), #(Minute, minute_units),
+  #(Second, second_units), #(MilliSecond, milli_second_units),
 ]
 
 /// you can use this function to create a new duration using expressions like:

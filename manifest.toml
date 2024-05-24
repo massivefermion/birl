@@ -8,6 +8,6 @@ packages = [
 ]
 
 [requirements]
-gleam_stdlib = { version = "~> 0.36 or ~> 1.0" }
-gleeunit = { version = "~> 1.0" }
+gleam_stdlib = { version = "~> 0.37 or ~> 1.0" }
+gleeunit = { version = "~> 1.1" }
 ranger = { version = "~> 1.2" }

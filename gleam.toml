@@ -1,5 +1,5 @@
 name = "birl"
-version = "1.6.1"
+version = "1.7.0"
 
 description = "Date / Time handling for Gleam"
 gleam = ">= 0.32.0"
@@ -10,7 +10,7 @@ links = [{ title = "Gleam", href = "https://gleam.run" }]
 
 [dependencies]
 ranger = "~> 1.2"
-gleam_stdlib = "~> 0.36 or ~> 1.0"
+gleam_stdlib = "~> 0.37 or ~> 1.0"
 
 [dev-dependencies]
-gleeunit = "~> 1.0"
+gleeunit = "~> 1.1"
