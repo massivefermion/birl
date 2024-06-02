@@ -31,14 +31,16 @@ export function to_parts(timestamp, offset) {
 }
 
 export function from_parts(parts, offset) {
-  const date = new Date();
-  date.setUTCFullYear(parts[0][0]);
-  date.setUTCMonth(parts[0][1] - 1);
-  date.setUTCDate(parts[0][2]);
-  date.setUTCHours(parts[1][0]);
-  date.setUTCMinutes(parts[1][1]);
-  date.setUTCSeconds(parts[1][2]);
-  date.setUTCMilliseconds(parts[1][3]);
+  const date = new Date(Date.UTC(
+    parts[0][0],
+    parts[0][1] - 1,
+    parts[0][2],
+    parts[1][0],
+    parts[1][1],
+    parts[1][2],
+    parts[1][3],
+  ));
+
   return date.getTime() * 1000 - offset;
 }
 
