@@ -31,15 +31,17 @@ export function to_parts(timestamp, offset) {
 }
 
 export function from_parts(parts, offset) {
-  const date = new Date(Date.UTC(
-    parts[0][0],
-    parts[0][1] - 1,
-    parts[0][2],
-    parts[1][0],
-    parts[1][1],
-    parts[1][2],
-    parts[1][3],
-  ));
+  const date = new Date(
+    Date.UTC(
+      parts[0][0],
+      parts[0][1] - 1,
+      parts[0][2],
+      parts[1][0],
+      parts[1][1],
+      parts[1][2],
+      parts[1][3]
+    )
+  );
 
   return date.getTime() * 1000 - offset;
 }

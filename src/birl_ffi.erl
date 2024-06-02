@@ -39,7 +39,7 @@ local_offset() ->
     if
         LD == UD ->
             (LH - UH) * 60 + LM - UM;
-        LD > UD andalso LMo == UMo ->
+        (LD > UD andalso LMo == UMo) or (LD == 1 andalso LMo > UMo) ->
             (23 - UH) * 60 + (60 - UM) + LH * 60 + LM;
         true ->
             -((23 - LH) * 60 + (60 - LM) + UH * 60 + UM)

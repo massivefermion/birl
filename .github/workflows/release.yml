@@ -13,7 +13,7 @@ jobs:
       - uses: erlef/setup-beam@v1
         with:
           otp-version: '26'
-          gleam-version: '1.1'
+          gleam-version: '1.2'
 
       - run: |
           version="v$(cat gleam.toml | grep -m 1 "version" | sed -r "s/version *= *\"([[:digit:].]+)\"/\1/")"
