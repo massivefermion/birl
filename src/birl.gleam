@@ -122,6 +122,11 @@ pub fn monotonic_now() -> Int {
   ffi_monotonic_now()
 }
 
+/// returns if the time has passed
+pub fn has_occured(value: Time) -> Bool {
+  compare(now(), value) == order.Gt
+}
+
 /// returns a string which is the date part of an ISO8601 string along with the offset
 pub fn to_date_string(value: Time) -> String {
   let #(#(year, month, day), _, offset) = to_parts(value)
