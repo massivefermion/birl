@@ -9,8 +9,8 @@ repository = { type = "github", user = "massivefermion", repo = "birl" }
 links = [{ title = "Gleam", href = "https://gleam.run" }]
 
 [dependencies]
-ranger = "~> 1.2"
-gleam_stdlib = "~> 0.38 or ~> 1.0"
+ranger = ">= 1.2.0 and < 2.0.0"
+gleam_stdlib = ">= 0.43.0 and < 2.0.0"
 
 [dev-dependencies]
-gleeunit = "~> 1.1"
+gleeunit = ">= 1.2.0 and < 2.0.0"
