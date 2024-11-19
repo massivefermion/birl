@@ -131,13 +131,13 @@ pub fn to_date_string(value: Time) -> String {
   <> {
     month
     |> int.to_string
-    |> string.pad_left(2, "0")
+    |> string.pad_start(2, "0")
   }
   <> "-"
   <> {
     day
     |> int.to_string
-    |> string.pad_left(2, "0")
+    |> string.pad_start(2, "0")
   }
   <> offset
 }
@@ -151,13 +151,13 @@ pub fn to_naive_date_string(value: Time) -> String {
   <> {
     month
     |> int.to_string
-    |> string.pad_left(2, "0")
+    |> string.pad_start(2, "0")
   }
   <> "-"
   <> {
     day
     |> int.to_string
-    |> string.pad_left(2, "0")
+    |> string.pad_start(2, "0")
   }
 }
 
@@ -168,25 +168,25 @@ pub fn to_time_string(value: Time) -> String {
   {
     hour
     |> int.to_string
-    |> string.pad_left(2, "0")
+    |> string.pad_start(2, "0")
   }
   <> ":"
   <> {
     minute
     |> int.to_string
-    |> string.pad_left(2, "0")
+    |> string.pad_start(2, "0")
   }
   <> ":"
   <> {
     second
     |> int.to_string
-    |> string.pad_left(2, "0")
+    |> string.pad_start(2, "0")
   }
   <> "."
   <> {
     milli_second
     |> int.to_string
-    |> string.pad_left(3, "0")
+    |> string.pad_start(3, "0")
   }
   <> offset
 }
@@ -198,25 +198,25 @@ pub fn to_naive_time_string(value: Time) -> String {
   {
     hour
     |> int.to_string
-    |> string.pad_left(2, "0")
+    |> string.pad_start(2, "0")
   }
   <> ":"
   <> {
     minute
     |> int.to_string
-    |> string.pad_left(2, "0")
+    |> string.pad_start(2, "0")
   }
   <> ":"
   <> {
     second
     |> int.to_string
-    |> string.pad_left(2, "0")
+    |> string.pad_start(2, "0")
   }
   <> "."
   <> {
     milli_second
     |> int.to_string
-    |> string.pad_left(3, "0")
+    |> string.pad_start(3, "0")
   }
 }
 
@@ -229,37 +229,37 @@ pub fn to_iso8601(value: Time) -> String {
   <> {
     month
     |> int.to_string
-    |> string.pad_left(2, "0")
+    |> string.pad_start(2, "0")
   }
   <> "-"
   <> {
     day
     |> int.to_string
-    |> string.pad_left(2, "0")
+    |> string.pad_start(2, "0")
   }
   <> "T"
   <> {
     hour
     |> int.to_string
-    |> string.pad_left(2, "0")
+    |> string.pad_start(2, "0")
   }
   <> ":"
   <> {
     minute
     |> int.to_string
-    |> string.pad_left(2, "0")
+    |> string.pad_start(2, "0")
   }
   <> ":"
   <> {
     second
     |> int.to_string
-    |> string.pad_left(2, "0")
+    |> string.pad_start(2, "0")
   }
   <> "."
   <> {
     milli_second
     |> int.to_string
-    |> string.pad_left(3, "0")
+    |> string.pad_start(3, "0")
   }
   <> offset
 }
@@ -316,7 +316,7 @@ pub fn parse(value: String) -> Result(Time, Nil) {
     || string.ends_with(offsetted_time_string, "z")
   {
     True ->
-      Ok(#(day_string, string.drop_right(offsetted_time_string, 1), "+00:00"))
+      Ok(#(day_string, string.drop_end(offsetted_time_string, 1), "+00:00"))
     False ->
       case regex.scan(offset_pattern, offsetted_time_string) {
         [regex.Match(_, [option.Some(time_string), option.Some(offset_string)])] ->
@@ -349,7 +349,7 @@ pub fn parse(value: String) -> Result(Time, Nil) {
         time_string,
         milli_seconds_string
           |> string.slice(0, 3)
-          |> string.pad_right(3, "0")
+          |> string.pad_end(3, "0")
           |> int.parse,
       ))
     }
@@ -401,14 +401,14 @@ pub fn parse_time_of_day(value: String) -> Result(#(TimeOfDay, String), Nil) {
     string.starts_with(value, "T"),
     string.starts_with(value, "t")
   {
-    True, _ | _, True -> string.drop_left(value, 1)
+    True, _ | _, True -> string.drop_start(value, 1)
     _, _ -> value
   }
 
   use #(time_string, offset_string) <- result.then(case
     string.ends_with(time_string, "Z") || string.ends_with(time_string, "z")
   {
-    True -> Ok(#(string.drop_right(value, 1), "+00:00"))
+    True -> Ok(#(string.drop_end(value, 1), "+00:00"))
     False ->
       case regex.scan(offset_pattern, value) {
         [regex.Match(_, [option.Some(time_string), option.Some(offset_string)])] ->
@@ -433,7 +433,7 @@ pub fn parse_time_of_day(value: String) -> Result(#(TimeOfDay, String), Nil) {
         time_string,
         milli_seconds_string
           |> string.slice(0, 3)
-          |> string.pad_right(3, "0")
+          |> string.pad_end(3, "0")
           |> int.parse,
       ))
     }
@@ -462,7 +462,7 @@ pub fn parse_naive_time_of_day(
     string.starts_with(value, "T"),
     string.starts_with(value, "t")
   {
-    True, _ | _, True -> string.drop_left(value, 1)
+    True, _ | _, True -> string.drop_start(value, 1)
     _, _ -> value
   }
 
@@ -482,7 +482,7 @@ pub fn parse_naive_time_of_day(
         time_string,
         milli_seconds_string
           |> string.slice(0, 3)
-          |> string.pad_right(3, "0")
+          |> string.pad_end(3, "0")
           |> int.parse,
       ))
     }
@@ -504,20 +504,20 @@ pub fn time_of_day_to_string(value: TimeOfDay) -> String {
   int.to_string(value.hour)
   <> ":"
   <> int.to_string(value.minute)
-  |> string.pad_left(2, "0")
+  |> string.pad_start(2, "0")
   <> ":"
   <> int.to_string(value.second)
-  |> string.pad_left(2, "0")
+  |> string.pad_start(2, "0")
   <> "."
   <> int.to_string(value.milli_second)
-  |> string.pad_left(3, "0")
+  |> string.pad_start(3, "0")
 }
 
 pub fn time_of_day_to_short_string(value: TimeOfDay) -> String {
   int.to_string(value.hour)
   <> ":"
   <> int.to_string(value.minute)
-  |> string.pad_left(2, "0")
+  |> string.pad_start(2, "0")
 }
 
 /// the naive format is the same as ISO8601 except that it does not contain the offset
@@ -530,37 +530,37 @@ pub fn to_naive(value: Time) -> String {
   <> {
     month
     |> int.to_string
-    |> string.pad_left(2, "0")
+    |> string.pad_start(2, "0")
   }
   <> "-"
   <> {
     day
     |> int.to_string
-    |> string.pad_left(2, "0")
+    |> string.pad_start(2, "0")
   }
   <> "T"
   <> {
     hour
     |> int.to_string
-    |> string.pad_left(2, "0")
+    |> string.pad_start(2, "0")
   }
   <> ":"
   <> {
     minute
     |> int.to_string
-    |> string.pad_left(2, "0")
+    |> string.pad_start(2, "0")
   }
   <> ":"
   <> {
     second
     |> int.to_string
-    |> string.pad_left(2, "0")
+    |> string.pad_start(2, "0")
   }
   <> "."
   <> {
     milli_second
     |> int.to_string
-    |> string.pad_left(3, "0")
+    |> string.pad_start(3, "0")
   }
 }
 
@@ -598,7 +598,7 @@ pub fn from_naive(value: String) -> Result(Time, Nil) {
         time_string,
         milli_seconds_string
           |> string.slice(0, 3)
-          |> string.pad_right(3, "0")
+          |> string.pad_end(3, "0")
           |> int.parse,
       ))
 
@@ -636,7 +636,7 @@ pub fn to_http(value: Time) -> String {
   <> {
     day
     |> int.to_string
-    |> string.pad_left(2, "0")
+    |> string.pad_start(2, "0")
   }
   <> " "
   <> short_month
@@ -646,19 +646,19 @@ pub fn to_http(value: Time) -> String {
   <> {
     hour
     |> int.to_string
-    |> string.pad_left(2, "0")
+    |> string.pad_start(2, "0")
   }
   <> ":"
   <> {
     minute
     |> int.to_string
-    |> string.pad_left(2, "0")
+    |> string.pad_start(2, "0")
   }
   <> ":"
   <> {
     second
     |> int.to_string
-    |> string.pad_left(2, "0")
+    |> string.pad_start(2, "0")
   }
   <> " GMT"
 }
@@ -679,7 +679,7 @@ pub fn to_http_with_offset(value: Time) -> String {
   <> {
     day
     |> int.to_string
-    |> string.pad_left(2, "0")
+    |> string.pad_start(2, "0")
   }
   <> " "
   <> short_month
@@ -689,19 +689,19 @@ pub fn to_http_with_offset(value: Time) -> String {
   <> {
     hour
     |> int.to_string
-    |> string.pad_left(2, "0")
+    |> string.pad_start(2, "0")
   }
   <> ":"
   <> {
     minute
     |> int.to_string
-    |> string.pad_left(2, "0")
+    |> string.pad_start(2, "0")
   }
   <> ":"
   <> {
     second
     |> int.to_string
-    |> string.pad_left(2, "0")
+    |> string.pad_start(2, "0")
   }
   <> " "
   <> offset
@@ -918,7 +918,7 @@ pub fn parse_relative(origin: Time, legible_difference: String) {
     | [amount_string, unit, "hence"] -> {
       let unit = case string.ends_with(unit, "s") {
         False -> unit
-        True -> string.drop_right(unit, 1)
+        True -> string.drop_end(unit, 1)
       }
 
       use amount <- result.then(int.parse(amount_string))
@@ -933,7 +933,7 @@ pub fn parse_relative(origin: Time, legible_difference: String) {
     | [amount_string, unit, "in the past"] -> {
       let unit = case string.ends_with(unit, "s") {
         False -> unit
-        True -> string.drop_right(unit, 1)
+        True -> string.drop_end(unit, 1)
       }
 
       use amount <- result.then(int.parse(amount_string))
@@ -1386,7 +1386,7 @@ fn generate_offset(offset: Int) -> Result(String, Nil) {
               "+",
               hour
                 |> int.to_string
-                |> string.pad_left(2, "0"),
+                |> string.pad_start(2, "0"),
             ])
           False ->
             string.concat([
@@ -1394,13 +1394,13 @@ fn generate_offset(offset: Int) -> Result(String, Nil) {
               hour
                 |> int.absolute_value
                 |> int.to_string
-                |> string.pad_left(2, "0"),
+                |> string.pad_start(2, "0"),
             ])
         },
         minute
           |> int.absolute_value
           |> int.to_string
-          |> string.pad_left(2, "0"),
+          |> string.pad_start(2, "0"),
       ]
       |> string.join(":")
       |> Ok
@@ -1413,7 +1413,7 @@ fn generate_offset(offset: Int) -> Result(String, Nil) {
               "+",
               hour
                 |> int.to_string
-                |> string.pad_left(2, "0"),
+                |> string.pad_start(2, "0"),
             ])
           False ->
             string.concat([
@@ -1421,7 +1421,7 @@ fn generate_offset(offset: Int) -> Result(String, Nil) {
               hour
                 |> int.absolute_value
                 |> int.to_string
-                |> string.pad_left(2, "0"),
+                |> string.pad_start(2, "0"),
             ])
         },
         "00",
