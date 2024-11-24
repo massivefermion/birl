@@ -70,7 +70,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             .map(|line| strip_comments(line.to_string()))
             .collect::<Vec<_>>();
 
-        let parser = LineParser::new();
+        let parser = LineParser::default();
         let mut builder = TableBuilder::new();
         for line in &lines {
             match parser.parse_str(line).unwrap() {

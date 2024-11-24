@@ -406,8 +406,7 @@ pub fn parse_time_of_day(value: String) -> Result(#(TimeOfDay, String), Nil) {
   }
 
   use #(time_string, offset_string) <- result.then(case
-    string.ends_with(time_string, "Z")
-    || string.ends_with(time_string, "z")
+    string.ends_with(time_string, "Z") || string.ends_with(time_string, "z")
   {
     True -> Ok(#(string.drop_right(value, 1), "+00:00"))
     False ->

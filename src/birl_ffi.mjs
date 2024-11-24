@@ -1,24 +1,24 @@
-import { Some } from '../gleam_stdlib/gleam/option.mjs';
+import { Some } from '../gleam_stdlib/gleam/option.mjs'
 
 export function now() {
-  return Date.now() * 1000;
+  return Date.now() * 1000
 }
 
 export function local_offset() {
-  const date = new Date();
-  return -date.getTimezoneOffset();
+  const date = new Date()
+  return -date.getTimezoneOffset()
 }
 
 export function local_timezone() {
-  return new Some(Intl.DateTimeFormat().resolvedOptions().timeZone);
+  return new Some(Intl.DateTimeFormat().resolvedOptions().timeZone)
 }
 
 export function monotonic_now() {
-  return Math.floor(globalThis.performance.now() * 1000);
+  return Math.floor(globalThis.performance.now() * 1000)
 }
 
 export function to_parts(timestamp, offset) {
-  const date = new Date((timestamp + offset) / 1000);
+  const date = new Date((timestamp + offset) / 1000)
   return [
     [date.getUTCFullYear(), date.getUTCMonth() + 1, date.getUTCDate()],
     [
@@ -27,7 +27,7 @@ export function to_parts(timestamp, offset) {
       date.getUTCSeconds(),
       date.getUTCMilliseconds(),
     ],
-  ];
+  ]
 }
 
 export function from_parts(parts, offset) {
@@ -41,12 +41,12 @@ export function from_parts(parts, offset) {
       parts[1][2],
       parts[1][3]
     )
-  );
+  )
 
-  return date.getTime() * 1000 - offset;
+  return date.getTime() * 1000 - offset
 }
 
 export function weekday(timestamp, offset) {
-  const date = new Date((timestamp + offset) / 1000);
-  return date.getUTCDay();
+  const date = new Date((timestamp + offset) / 1000)
+  return date.getUTCDay()
 }
