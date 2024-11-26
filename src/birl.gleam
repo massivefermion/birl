@@ -5,7 +5,7 @@ import gleam/iterator
 import gleam/list
 import gleam/option
 import gleam/order
-import gleam/regex
+import gleam/regexp
 import gleam/result
 import gleam/string
 
@@ -292,7 +292,7 @@ pub fn to_iso8601(value: Time) -> String {
 /// 
 ///   - `1905-12-22T16:38:23.000+03:30` -> `1905-12-22T16:38:23.000+03:30`
 pub fn parse(value: String) -> Result(Time, Nil) {
-  let assert Ok(offset_pattern) = regex.from_string("(.*)([+|\\-].*)")
+  let assert Ok(offset_pattern) = regexp.from_string("(.*)([+|\\-].*)")
   let value = string.trim(value)
 
   use #(day_string, offsetted_time_string) <- result.then(case
@@ -318,13 +318,17 @@ pub fn parse(value: String) -> Result(Time, Nil) {
     True ->
       Ok(#(day_string, string.drop_end(offsetted_time_string, 1), "+00:00"))
     False ->
-      case regex.scan(offset_pattern, offsetted_time_string) {
-        [regex.Match(_, [option.Some(time_string), option.Some(offset_string)])] ->
-          Ok(#(day_string, time_string, offset_string))
+      case regexp.scan(offset_pattern, offsetted_time_string) {
+        [
+          regexp.Match(
+            _,
+            [option.Some(time_string), option.Some(offset_string)],
+          ),
+        ] -> Ok(#(day_string, time_string, offset_string))
         _ ->
-          case regex.scan(offset_pattern, day_string) {
+          case regexp.scan(offset_pattern, day_string) {
             [
-              regex.Match(
+              regexp.Match(
                 _,
                 [option.Some(day_string), option.Some(offset_string)],
               ),
@@ -395,7 +399,7 @@ pub fn parse(value: String) -> Result(Time, Nil) {
 /// 
 ///   - `T16:38:23.050+03:30` -> `#(TimeOfDay(16, 38, 23, 50), "+03:30")`
 pub fn parse_time_of_day(value: String) -> Result(#(TimeOfDay, String), Nil) {
-  let assert Ok(offset_pattern) = regex.from_string("(.*)([+|\\-].*)")
+  let assert Ok(offset_pattern) = regexp.from_string("(.*)([+|\\-].*)")
 
   let time_string = case
     string.starts_with(value, "T"),
@@ -410,9 +414,13 @@ pub fn parse_time_of_day(value: String) -> Result(#(TimeOfDay, String), Nil) {
   {
     True -> Ok(#(string.drop_end(value, 1), "+00:00"))
     False ->
-      case regex.scan(offset_pattern, value) {
-        [regex.Match(_, [option.Some(time_string), option.Some(offset_string)])] ->
-          Ok(#(time_string, offset_string))
+      case regexp.scan(offset_pattern, value) {
+        [
+          regexp.Match(
+            _,
+            [option.Some(time_string), option.Some(offset_string)],
+          ),
+        ] -> Ok(#(time_string, offset_string))
         _ -> Error(Nil)
       }
   })
@@ -733,8 +741,8 @@ pub fn from_http(value: String) -> Result(Time, Nil) {
   )
 
   let rest = string.trim(rest)
-  let assert Ok(whitespace_pattern) = regex.from_string("\\s+")
-  case regex.split(whitespace_pattern, rest) {
+  let assert Ok(whitespace_pattern) = regexp.from_string("\\s+")
+  case regexp.split(whitespace_pattern, rest) {
     [day_string, month_string, year_string, time_string, offset_string] -> {
       let time_string = string.replace(time_string, ":", "")
       case
@@ -1322,9 +1330,9 @@ fn to_parts(value: Time) -> #(#(Int, Int, Int), #(Int, Int, Int, Int), String) {
 
 fn parse_offset(offset: String) -> Result(Int, Nil) {
   use <- bool.guard(list.contains(["Z", "z"], offset), Ok(0))
-  let assert Ok(re) = regex.from_string("([+-])")
+  let assert Ok(re) = regexp.from_string("([+-])")
 
-  use #(sign, offset) <- result.then(case regex.split(re, offset) {
+  use #(sign, offset) <- result.then(case regexp.split(re, offset) {
     ["", "+", offset] -> Ok(#(1, offset))
     ["", "-", offset] -> Ok(#(-1, offset))
     [_] -> Ok(#(1, offset))
@@ -1438,25 +1446,25 @@ fn parse_date_section(date: String) -> Result(List(Int), Nil) {
   case string.contains(date, "-") {
     True -> {
       let assert Ok(dash_pattern) =
-        regex.from_string(
+        regexp.from_string(
           "(\\d{4})(?:-(1[0-2]|0?[0-9]))?(?:-(3[0-1]|[1-2][0-9]|0?[0-9]))?",
         )
 
-      case regex.scan(dash_pattern, date) {
-        [regex.Match(_, [option.Some(major)])] -> [
+      case regexp.scan(dash_pattern, date) {
+        [regexp.Match(_, [option.Some(major)])] -> [
           int.parse(major),
           Ok(1),
           Ok(1),
         ]
 
-        [regex.Match(_, [option.Some(major), option.Some(middle)])] -> [
+        [regexp.Match(_, [option.Some(major), option.Some(middle)])] -> [
           int.parse(major),
           int.parse(middle),
           Ok(1),
         ]
 
         [
-          regex.Match(
+          regexp.Match(
             _,
             [option.Some(major), option.Some(middle), option.Some(minor)],
           ),
@@ -1517,22 +1525,22 @@ fn parse_section(
   pattern_string: String,
   default: Int,
 ) -> List(Result(Int, Nil)) {
-  let assert Ok(pattern) = regex.from_string(pattern_string)
-  case regex.scan(pattern, section) {
-    [regex.Match(_, [option.Some(major)])] -> [
+  let assert Ok(pattern) = regexp.from_string(pattern_string)
+  case regexp.scan(pattern, section) {
+    [regexp.Match(_, [option.Some(major)])] -> [
       int.parse(major),
       Ok(default),
       Ok(default),
     ]
 
-    [regex.Match(_, [option.Some(major), option.Some(middle)])] -> [
+    [regexp.Match(_, [option.Some(major), option.Some(middle)])] -> [
       int.parse(major),
       int.parse(middle),
       Ok(default),
     ]
 
     [
-      regex.Match(
+      regexp.Match(
         _,
         [option.Some(major), option.Some(middle), option.Some(minor)],
       ),
