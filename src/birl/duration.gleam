@@ -204,7 +204,7 @@ pub fn accurate_decompose(duration: Duration) -> List(#(Int, Unit)) {
 ///   - `blur_to(days(16), Month)` ->  `0`
 ///   - `blur_to(days(20), Month)` ->  `1`
 pub fn blur_to(duration: Duration, unit: Unit) -> Int {
-  let assert Ok(unit_value) = list.key_find(unit_values, unit)
+  let unit_value = unit_values(unit)
   let Duration(value) = duration
   let #(unit_counts, remaining) = extract(value, unit_value)
   case remaining >= unit_value * 2 / 3 {
@@ -215,13 +215,9 @@ pub fn blur_to(duration: Duration, unit: Unit) -> Int {
 
 /// approximates the duration by a value in a single unit
 pub fn blur(duration: Duration) -> #(Int, Unit) {
-  case decompose(duration) {
-    [] -> #(0, MicroSecond)
-    decomposed ->
-      decomposed
-      |> list.reverse
-      |> inner_blur
-  }
+  decompose(duration)
+  |> list.reverse
+  |> inner_blur
 }
 
 const milli_second = 1000
@@ -244,25 +240,38 @@ const accurate_month = 2_629_746_000_000
 
 const accurate_year = 31_556_952_000_000
 
-const unit_values = [
-  #(Year, year), #(Month, month), #(Week, week), #(Day, day), #(Hour, hour),
-  #(Minute, minute), #(Second, second), #(MilliSecond, milli_second),
-  #(MicroSecond, 1),
-]
+fn unit_values(unit: Unit) {
+  case unit {
+    Year -> year
+    Month -> month
+    Week -> week
+    Day -> day
+    Hour -> hour
+    Minute -> minute
+    Second -> second
+    MilliSecond -> milli_second
+    MicroSecond -> 1
+  }
+}
 
 fn inner_blur(values: List(#(Int, Unit))) -> #(Int, Unit) {
-  let assert [second, leading, ..] = values
-  let assert Ok(leading_unit) = list.key_find(unit_values, leading.1)
-  let assert Ok(second_unit) = list.key_find(unit_values, second.1)
+  case values {
+    [] -> #(0, MicroSecond)
+    [single] -> single
+    [smaller, larger, ..rest] -> {
+      let smaller_unit_value = unit_values(smaller.1)
+      let larger_unit_value = unit_values(larger.1)
 
-  let leading = case second.0 * second_unit < { leading_unit * 2 / 3 } {
-    True -> leading
-    False -> #(leading.0 + 1, leading.1)
-  }
+      let at_least_two_thirds =
+        smaller.0 * smaller_unit_value < { larger_unit_value * 2 / 3 }
 
-  case list.drop(values, 2) {
-    [] -> leading
-    chopped -> inner_blur([leading, ..chopped])
+      let rounded = case at_least_two_thirds {
+        True -> larger
+        False -> #(larger.0 + 1, larger.1)
+      }
+
+      inner_blur([rounded, ..rest])
+    }
   }
 }
 
