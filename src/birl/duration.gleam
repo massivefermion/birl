@@ -2,7 +2,7 @@ import gleam/int
 import gleam/list
 import gleam/option
 import gleam/order
-import gleam/regex
+import gleam/regexp
 import gleam/result
 import gleam/string
 
@@ -325,7 +325,7 @@ const units = [
 /// numbers with no unit are considered as microseconds.
 /// specifying `accurate:` is equivalent to using `accurate_new`.
 pub fn parse(expression: String) -> Result(Duration, Nil) {
-  let assert Ok(re) = regex.from_string("([+|\\-])?\\s*(\\d+)\\s*(\\w+)?")
+  let assert Ok(re) = regexp.from_string("([+|\\-])?\\s*(\\d+)\\s*(\\w+)?")
 
   let #(constructor, expression) = case
     string.starts_with(expression, "accurate:")
@@ -340,10 +340,10 @@ pub fn parse(expression: String) -> Result(Duration, Nil) {
   case
     expression
     |> string.lowercase
-    |> regex.scan(re, _)
+    |> regexp.scan(re, _)
     |> list.try_map(fn(item) {
       case item {
-        regex.Match(_, [sign_option, option.Some(amount_string)]) -> {
+        regexp.Match(_, [sign_option, option.Some(amount_string)]) -> {
           use amount <- result.then(int.parse(amount_string))
 
           case sign_option {
@@ -353,7 +353,7 @@ pub fn parse(expression: String) -> Result(Duration, Nil) {
           }
         }
 
-        regex.Match(
+        regexp.Match(
           _,
           [sign_option, option.Some(amount_string), option.Some(unit)],
         ) -> {
