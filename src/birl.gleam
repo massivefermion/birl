@@ -8,7 +8,7 @@ import gleam/order
 import gleam/regexp
 import gleam/result
 import gleam/string
-
+import gleam/yielder
 import birl/duration
 import birl/zones
 
@@ -1153,7 +1153,7 @@ pub fn range(
   from a: Time,
   to b: option.Option(Time),
   step s: duration.Duration,
-) -> iterator.Iterator(Time) {
+) -> yielder.Yielder(Time) {
   let assert Ok(range) = case b {
     option.Some(b) ->
       ranger.create(
