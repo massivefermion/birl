@@ -1,16 +1,14 @@
+import birl/duration
+import birl/zones
 import gleam/bool
 import gleam/function
 import gleam/int
-import gleam/iterator
 import gleam/list
 import gleam/option
 import gleam/order
 import gleam/regexp
 import gleam/result
 import gleam/string
-import gleam/yielder
-import birl/duration
-import birl/zones
 
 import ranger
 
@@ -270,31 +268,31 @@ pub fn to_iso8601(value: Time) -> String {
 }
 
 /// if you need to parse an `ISO8601` string, this is probably what you're looking for.
-/// 
+///
 /// given the huge surface area that `ISO8601` covers, it does not make sense for `birl`
 /// to support all of it in one function, so this function parses only strings for which both
 /// day and time of day can be extracted or deduced. Some acceptable examples are given below:
-/// 
+///
 ///   - `2019t14-4` -> `2019-01-01T14:00:00.000-04:00`
-/// 
+///
 ///   - `2019-03-26t14:00.9z` -> `2019-03-26T14:00:00.900Z`
-/// 
+///
 ///   - `2019-03-26+330` -> `2019-03-26T00:00:00.000+03:30`
-/// 
+///
 ///   - `20190326t1400-4` -> `2019-03-26T14:00:00.000-04:00`
-/// 
+///
 ///   - `19051222T16:38-3` -> `1905-12-22T16:38:00.000-03:00`
-/// 
+///
 ///   - `2019-03-26 14:30:00.9Z` -> `2019-03-26T14:30:00.900Z`
-/// 
+///
 ///   - `2019-03-26T14:00:00.9Z` -> `2019-03-26T14:00:00.900Z`
-/// 
+///
 ///   - `1905-12-22 16:38:23-3` -> `1905-12-22T16:38:23.000-03:00`
-/// 
+///
 ///   - `2019-03-26T14:00:00,4999Z` -> `2019-03-26T14:00:00.499Z`
-/// 
+///
 ///   - `1905-12-22T163823+0330` -> `1905-12-22T16:38:23.000+03:30`
-/// 
+///
 ///   - `1905-12-22T16:38:23.000+03:30` -> `1905-12-22T16:38:23.000+03:30`
 pub fn parse(value: String) -> Result(Time, Nil) {
   let assert Ok(offset_pattern) = regexp.from_string("(.*)([+|\\-].*)")
@@ -391,17 +389,17 @@ pub fn parse(value: String) -> Result(Time, Nil) {
 /// in the string. Some acceptable examples are given below:
 ///
 ///   - `t25z` -> `#(TimeOfDay(2, 5, 0, 0), "Z")`
-/// 
+///
 ///   - `14-4` -> `#(TimeOfDay(14, 0, 0, 0), "-04:00")`
-/// 
+///
 ///   - `T145+4` -> `#(TimeOfDay(14, 5, 0, 0), "+04:00")`
-/// 
+///
 ///   - `16:38-3` -> `#(TimeOfDay(16, 38, 0, 0), "-03:00")`
-/// 
+///
 ///   - `t14:65.9z` -> `#(TimeOfDay(14, 6, 5, 900), "-04:00")`
-/// 
+///
 ///   - `163823+0330` -> `#(TimeOfDay(16, 38, 23, 0), "+03:30")`
-/// 
+///
 ///   - `T16:38:23.050+03:30` -> `#(TimeOfDay(16, 38, 23, 50), "+03:30")`
 pub fn parse_time_of_day(value: String) -> Result(#(TimeOfDay, String), Nil) {
   let assert Ok(offset_pattern) = regexp.from_string("(.*)([+|\\-].*)")
@@ -917,7 +915,7 @@ const string_to_units = [
 ]
 
 /// you could say this is the opposite of `legible_difference`
-/// 
+///
 /// ```gleam
 /// > parse_relative(birl.now(), "8 minutes ago")
 /// ```
@@ -1149,11 +1147,7 @@ pub fn short_string_month(value: Time) -> String {
 /// can be used to create a time range starting from time `a` with step `s`
 ///
 /// if `b` is `option.None` the range will be infinite
-pub fn range(
-  from a: Time,
-  to b: option.Option(Time),
-  step s: duration.Duration,
-) -> yielder.Yielder(Time) {
+pub fn range(from a: Time, to b: option.Option(Time), step s: duration.Duration) {
   let assert Ok(range) = case b {
     option.Some(b) ->
       ranger.create(

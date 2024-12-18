@@ -9,7 +9,7 @@ repository = { type = "github", user = "massivefermion", repo = "birl" }
 links = [{ title = "Gleam", href = "https://gleam.run" }]
 
 [dependencies]
-ranger = ">= 1.2.0 and < 2.0.0"
+ranger = ">= 1.4.0 and < 2.0.0"
 gleam_stdlib = ">= 0.44.0 and < 2.0.0"
 gleam_regexp = ">= 1.0.0 and < 2.0.0"
 
