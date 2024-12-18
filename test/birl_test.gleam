@@ -27,6 +27,8 @@ pub fn main() {
   gleeunit.main()
 }
 
+// `birl` tests
+
 pub fn now_test() {
   birl.now()
   |> birl.to_iso8601
@@ -240,4 +242,33 @@ pub fn weekday_to_short_string_test() {
 
   birl.weekday_to_short_string(birl.Mon)
   |> should.equal("Mon")
+}
+
+// `duration` tests
+
+pub fn blur_test() {
+  // unchanged
+  duration.seconds(59)
+  |> duration.blur
+  |> should.equal(#(59, duration.Second))
+
+  // exact value
+  duration.seconds(60)
+  |> duration.blur
+  |> should.equal(#(1, duration.Minute))
+
+  // almost rounded
+  duration.seconds(99)
+  |> duration.blur
+  |> should.equal(#(1, duration.Minute))
+
+  // rounded
+  duration.seconds(100)
+  |> duration.blur
+  |> should.equal(#(2, duration.Minute))
+
+  // goes through many units
+  duration.seconds(60 * 60 * 24 * 400)
+  |> duration.blur
+  |> should.equal(#(1, duration.Year))
 }
