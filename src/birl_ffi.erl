@@ -78,7 +78,8 @@ local_timezone() ->
 monotonic_now() ->
     StartTime = erlang:system_info(start_time),
     CurrentTime = erlang:monotonic_time(),
-    (CurrentTime - StartTime) div 1_000.
+    Difference = (CurrentTime - StartTime),
+    erlang:convert_time_unit(Difference, native, microsecond).
 
 to_parts(Timestamp, Offset) ->
     {Date, {Hour, Minute, Second}} = calendar:system_time_to_universal_time(
