@@ -344,7 +344,7 @@ pub fn parse(expression: String) -> Result(Duration, Nil) {
     |> list.try_map(fn(item) {
       case item {
         regexp.Match(_, [sign_option, option.Some(amount_string)]) -> {
-          use amount <- result.then(int.parse(amount_string))
+          use amount <- result.try(int.parse(amount_string))
 
           case sign_option {
             option.Some("-") -> Ok(#(-1 * amount, MicroSecond))
@@ -357,8 +357,8 @@ pub fn parse(expression: String) -> Result(Duration, Nil) {
           _,
           [sign_option, option.Some(amount_string), option.Some(unit)],
         ) -> {
-          use amount <- result.then(int.parse(amount_string))
-          use #(unit, _) <- result.then(
+          use amount <- result.try(int.parse(amount_string))
+          use #(unit, _) <- result.try(
             list.find(units, fn(item) { list.contains(item.1, unit) }),
           )
 
