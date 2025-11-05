@@ -91,7 +91,7 @@ pub fn utc_now() -> Time {
 ///
 /// `"+330", "03:30", "-8:00","-7", "-0400", "03"`
 pub fn now_with_offset(offset: String) -> Result(Time, Nil) {
-  use offset <- result.then(parse_offset(offset))
+  use offset <- result.try(parse_offset(offset))
   let now = ffi_now()
   let monotonic_now = ffi_monotonic_now()
   Time(now, offset, option.None, option.Some(monotonic_now))
@@ -298,7 +298,7 @@ pub fn parse(value: String) -> Result(Time, Nil) {
   let assert Ok(offset_pattern) = regexp.from_string("(.*)([+|\\-].*)")
   let value = string.trim(value)
 
-  use #(day_string, offsetted_time_string) <- result.then(case
+  use #(day_string, offsetted_time_string) <- result.try(case
     string.split(value, "T"),
     string.split(value, "t"),
     string.split(value, " ")
@@ -314,7 +314,7 @@ pub fn parse(value: String) -> Result(Time, Nil) {
   let day_string = string.trim(day_string)
   let offsetted_time_string = string.trim(offsetted_time_string)
 
-  use #(day_string, time_string, offset_string) <- result.then(case
+  use #(day_string, time_string, offset_string) <- result.try(case
     string.ends_with(offsetted_time_string, "Z")
     || string.ends_with(offsetted_time_string, "z")
   {
@@ -342,7 +342,7 @@ pub fn parse(value: String) -> Result(Time, Nil) {
   })
 
   let time_string = string.replace(time_string, ":", "")
-  use #(time_string, milli_seconds_result) <- result.then(case
+  use #(time_string, milli_seconds_result) <- result.try(case
     string.split(time_string, "."),
     string.split(time_string, ",")
   {
@@ -366,10 +366,10 @@ pub fn parse(value: String) -> Result(Time, Nil) {
 
   case milli_seconds_result {
     Ok(milli_seconds) -> {
-      use day <- result.then(parse_date_section(day_string))
+      use day <- result.try(parse_date_section(day_string))
       let assert [year, month, date] = day
 
-      use time_of_day <- result.then(parse_time_section(time_string))
+      use time_of_day <- result.try(parse_time_section(time_string))
       let assert [hour, minute, second] = time_of_day
 
       from_parts(
@@ -412,7 +412,7 @@ pub fn parse_time_of_day(value: String) -> Result(#(TimeOfDay, String), Nil) {
     _, _ -> value
   }
 
-  use #(time_string, offset_string) <- result.then(case
+  use #(time_string, offset_string) <- result.try(case
     string.ends_with(time_string, "Z") || string.ends_with(time_string, "z")
   {
     True -> Ok(#(string.drop_end(value, 1), "+00:00"))
@@ -430,7 +430,7 @@ pub fn parse_time_of_day(value: String) -> Result(#(TimeOfDay, String), Nil) {
 
   let time_string = string.replace(time_string, ":", "")
 
-  use #(time_string, milli_seconds_result) <- result.then(case
+  use #(time_string, milli_seconds_result) <- result.try(case
     string.split(time_string, "."),
     string.split(time_string, ",")
   {
@@ -453,11 +453,11 @@ pub fn parse_time_of_day(value: String) -> Result(#(TimeOfDay, String), Nil) {
 
   case milli_seconds_result {
     Ok(milli_seconds) -> {
-      use time_of_day <- result.then(parse_time_section(time_string))
+      use time_of_day <- result.try(parse_time_section(time_string))
       let assert [hour, minute, second] = time_of_day
 
-      use offset <- result.then(parse_offset(offset_string))
-      use offset_string <- result.then(generate_offset(offset))
+      use offset <- result.try(parse_offset(offset_string))
+      use offset_string <- result.try(generate_offset(offset))
 
       Ok(#(TimeOfDay(hour, minute, second, milli_seconds), offset_string))
     }
@@ -479,7 +479,7 @@ pub fn parse_naive_time_of_day(
 
   let time_string = string.replace(time_string, ":", "")
 
-  use #(time_string, milli_seconds_result) <- result.then(case
+  use #(time_string, milli_seconds_result) <- result.try(case
     string.split(time_string, "."),
     string.split(time_string, ",")
   {
@@ -502,7 +502,7 @@ pub fn parse_naive_time_of_day(
 
   case milli_seconds_result {
     Ok(milli_seconds) -> {
-      use time_of_day <- result.then(parse_time_section(time_string))
+      use time_of_day <- result.try(parse_time_section(time_string))
       let assert [hour, minute, second] = time_of_day
 
       Ok(#(TimeOfDay(hour, minute, second, milli_seconds), "Z"))
@@ -579,7 +579,7 @@ pub fn to_naive(value: Time) -> String {
 pub fn from_naive(value: String) -> Result(Time, Nil) {
   let value = string.trim(value)
 
-  use #(day_string, time_string) <- result.then(case
+  use #(day_string, time_string) <- result.try(case
     string.split(value, "T"),
     string.split(value, "t"),
     string.split(value, " ")
@@ -596,7 +596,7 @@ pub fn from_naive(value: String) -> Result(Time, Nil) {
   let time_string = string.trim(time_string)
 
   let time_string = string.replace(time_string, ":", "")
-  use #(time_string, milli_seconds_result) <- result.then(case
+  use #(time_string, milli_seconds_result) <- result.try(case
     string.split(time_string, "."),
     string.split(time_string, ",")
   {
@@ -618,10 +618,10 @@ pub fn from_naive(value: String) -> Result(Time, Nil) {
 
   case milli_seconds_result {
     Ok(milli_seconds) -> {
-      use day <- result.then(parse_date_section(day_string))
+      use day <- result.try(parse_date_section(day_string))
       let assert [year, month, date] = day
 
-      use time_of_day <- result.then(parse_time_section(time_string))
+      use time_of_day <- result.try(parse_time_section(time_string))
       let assert [hour, minute, second] = time_of_day
 
       from_parts(
@@ -733,7 +733,7 @@ pub fn to_http_with_offset(value: Time) -> String {
 ///   - `Tuesday, 01 November 2016 08:49:37 +06:30`
 pub fn from_http(value: String) -> Result(Time, Nil) {
   let value = string.trim(value)
-  use #(weekday, rest) <- result.then(string.split_once(value, ","))
+  use #(weekday, rest) <- result.try(string.split_once(value, ","))
 
   use <- bool.guard(
     !list.any(weekday_strings, fn(weekday_item) {
@@ -932,8 +932,8 @@ pub fn parse_relative(origin: Time, legible_difference: String) {
         True -> string.drop_end(unit, 1)
       }
 
-      use amount <- result.then(int.parse(amount_string))
-      use unit <- result.then(list.key_find(string_to_units, unit))
+      use amount <- result.try(int.parse(amount_string))
+      use unit <- result.try(list.key_find(string_to_units, unit))
       Ok(add(origin, duration.new([#(amount, unit)])))
     }
 
@@ -947,8 +947,8 @@ pub fn parse_relative(origin: Time, legible_difference: String) {
         True -> string.drop_end(unit, 1)
       }
 
-      use amount <- result.then(int.parse(amount_string))
-      use unit <- result.then(list.key_find(string_to_units, unit))
+      use amount <- result.try(int.parse(amount_string))
+      use unit <- result.try(list.key_find(string_to_units, unit))
       Ok(subtract(origin, duration.new([#(amount, unit)])))
     }
 
@@ -1195,7 +1195,7 @@ pub fn get_timezone(value: Time) -> option.Option(String) {
 ///
 /// `"+330", "03:30", "-8:00","-7", "-0400", "03", "Z"`
 pub fn set_offset(value: Time, new_offset: String) -> Result(Time, Nil) {
-  use new_offset_number <- result.then(parse_offset(new_offset))
+  use new_offset_number <- result.try(parse_offset(new_offset))
   case value {
     Time(wall_time: t, offset: _, timezone: timezone, monotonic_time: mt) ->
       Time(t, new_offset_number, timezone, mt)
@@ -1311,7 +1311,7 @@ fn from_parts(
   time: #(Int, Int, Int, Int),
   offset: String,
 ) -> Result(Time, Nil) {
-  use offset_number <- result.then(parse_offset(offset))
+  use offset_number <- result.try(parse_offset(offset))
   ffi_from_parts(#(date, time), offset_number)
   |> Time(offset_number, option.None, option.None)
   |> Ok
@@ -1331,7 +1331,7 @@ fn parse_offset(offset: String) -> Result(Int, Nil) {
   use <- bool.guard(list.contains(["Z", "z"], offset), Ok(0))
   let assert Ok(re) = regexp.from_string("([+-])")
 
-  use #(sign, offset) <- result.then(case regexp.split(re, offset) {
+  use #(sign, offset) <- result.try(case regexp.split(re, offset) {
     ["", "+", offset] -> Ok(#(1, offset))
     ["", "-", offset] -> Ok(#(-1, offset))
     [_] -> Ok(#(1, offset))
@@ -1340,18 +1340,18 @@ fn parse_offset(offset: String) -> Result(Int, Nil) {
 
   case string.split(offset, ":") {
     [hour_str, minute_str] -> {
-      use hour <- result.then(int.parse(hour_str))
-      use minute <- result.then(int.parse(minute_str))
+      use hour <- result.try(int.parse(hour_str))
+      use minute <- result.try(int.parse(minute_str))
       Ok(sign * { hour * 60 + minute } * 60 * 1_000_000)
     }
     [offset] ->
       case string.length(offset) {
         1 -> {
-          use hour <- result.then(int.parse(offset))
+          use hour <- result.try(int.parse(offset))
           Ok(sign * hour * 3600 * 1_000_000)
         }
         2 -> {
-          use number <- result.then(int.parse(offset))
+          use number <- result.try(int.parse(offset))
           case number < 14 {
             True -> Ok(sign * number * 3600 * 1_000_000)
             False ->
@@ -1361,15 +1361,15 @@ fn parse_offset(offset: String) -> Result(Int, Nil) {
         3 -> {
           let assert Ok(hour_str) = string.first(offset)
           let minute_str = string.slice(offset, 1, 2)
-          use hour <- result.then(int.parse(hour_str))
-          use minute <- result.then(int.parse(minute_str))
+          use hour <- result.try(int.parse(hour_str))
+          use minute <- result.try(int.parse(minute_str))
           Ok(sign * { hour * 60 + minute } * 60 * 1_000_000)
         }
         4 -> {
           let hour_str = string.slice(offset, 0, 2)
           let minute_str = string.slice(offset, 2, 2)
-          use hour <- result.then(int.parse(hour_str))
-          use minute <- result.then(int.parse(minute_str))
+          use hour <- result.try(int.parse(hour_str))
+          use minute <- result.try(int.parse(minute_str))
           Ok(sign * { hour * 60 + minute } * 60 * 1_000_000)
         }
         _ -> Error(Nil)
