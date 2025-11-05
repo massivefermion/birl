@@ -1,5 +1,5 @@
 name = "birl"
-version = "1.8.0"
+version = "1.9.0"
 
 description = "Date / Time handling for Gleam"
 gleam = ">= 0.32.0"
