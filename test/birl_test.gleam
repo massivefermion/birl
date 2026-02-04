@@ -19,7 +19,7 @@ const minute = 38
 
 const second = 23
 
-const milli_second = 0
+const nanosecond = 0
 
 const offset = "+03:30"
 
@@ -67,7 +67,7 @@ pub fn to_parts_test() {
 
   time
   |> birl.get_time_of_day
-  |> should.equal(birl.TimeOfDay(hour, minute, second, milli_second))
+  |> should.equal(birl.TimeOfDay(hour, minute, second, nanosecond))
 
   time
   |> birl.get_offset
@@ -102,16 +102,16 @@ pub fn get_date_accessor_test() {
   time.second
   |> should.equal(second)
 
-  time.milli_second
-  |> should.equal(milli_second)
+  time.nanosecond
+  |> should.equal(nanosecond)
 }
 
 pub fn from_parts_test() {
-  birl.unix_epoch
+  birl.unix_epoch()
   |> birl.set_offset(offset)
   |> should.be_ok
   |> birl.set_day(birl.Day(year, month, date))
-  |> birl.set_time_of_day(birl.TimeOfDay(hour, minute, second, milli_second))
+  |> birl.set_time_of_day(birl.TimeOfDay(hour, minute, second, nanosecond))
   |> birl.to_iso8601
   |> should.equal(iso_datetime)
 }
@@ -190,10 +190,12 @@ pub fn weird_value8_test() {
 }
 
 pub fn time_of_day_to_string_test() {
-  birl.time_of_day_to_string(birl.TimeOfDay(8, 5, 9, 2))
+  // nanosecond field: 2_000_000 nanoseconds = 2 milliseconds
+  birl.time_of_day_to_string(birl.TimeOfDay(8, 5, 9, 2_000_000))
   |> should.equal("8:05:09.002")
 
-  birl.time_of_day_to_string(birl.TimeOfDay(16, 30, 20, 999))
+  // nanosecond field: 999_000_000 nanoseconds = 999 milliseconds
+  birl.time_of_day_to_string(birl.TimeOfDay(16, 30, 20, 999_000_000))
   |> should.equal("16:30:20.999")
 
   birl.time_of_day_to_string(birl.TimeOfDay(0, 0, 0, 0))

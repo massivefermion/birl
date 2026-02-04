@@ -8,13 +8,13 @@ on:
 
 jobs:
   test:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-22.04
     steps:
       - uses: actions/checkout@v4
       - uses: erlef/setup-beam@v1
         with:
-          otp-version: '26'
-          gleam-version: '1.6'
+          otp-version: '27'
+          gleam-version: '1.11'
           rebar3-version: '3'
       - run: gleam test
       - run: gleam format --check src test
