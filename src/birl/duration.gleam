@@ -5,6 +5,7 @@ import gleam/order
 import gleam/regexp
 import gleam/result
 import gleam/string
+import gleam/time/duration as time_duration
 
 pub type Duration {
   Duration(Int)
@@ -295,9 +296,14 @@ const milli_second_units = [
 ]
 
 const units = [
-  #(Year, year_units), #(Month, month_units), #(Week, week_units),
-  #(Day, day_units), #(Hour, hour_units), #(Minute, minute_units),
-  #(Second, second_units), #(MilliSecond, milli_second_units),
+  #(Year, year_units),
+  #(Month, month_units),
+  #(Week, week_units),
+  #(Day, day_units),
+  #(Hour, hour_units),
+  #(Minute, minute_units),
+  #(Second, second_units),
+  #(MilliSecond, milli_second_units),
 ]
 
 /// you can use this function to create a new duration using expressions like:
@@ -384,4 +390,26 @@ pub fn parse(expression: String) -> Result(Duration, Nil) {
 
 fn extract(duration: Int, unit_value: Int) -> #(Int, Int) {
   #(duration / unit_value, duration % unit_value)
+}
+
+// ---------------------------------------------------------------------------
+// gleam_time interoperability
+// ---------------------------------------------------------------------------
+
+/// Convert birl Duration to gleam_time Duration.
+///
+/// birl uses microseconds internally, while gleam_time uses nanoseconds.
+pub fn to_gleam_duration(d: Duration) -> time_duration.Duration {
+  let Duration(microseconds) = d
+  // Convert microseconds to nanoseconds
+  time_duration.nanoseconds(microseconds * 1000)
+}
+
+/// Convert gleam_time Duration to birl Duration.
+///
+/// gleam_time uses nanoseconds internally, while birl uses microseconds.
+/// Sub-microsecond precision will be lost.
+pub fn from_gleam_duration(d: time_duration.Duration) -> Duration {
+  let #(seconds, nanoseconds) = time_duration.to_seconds_and_nanoseconds(d)
+  Duration(seconds * 1_000_000 + nanoseconds / 1000)
 }
