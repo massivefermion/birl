@@ -9,6 +9,8 @@ import gleam/order
 import gleam/regexp
 import gleam/result
 import gleam/string
+import gleam/time/calendar
+import gleam/time/timestamp
 
 import ranger
 
@@ -1659,3 +1661,60 @@ fn ffi_weekday(a: Int, b: Int) -> Int
 @external(erlang, "birl_ffi", "local_timezone")
 @external(javascript, "./birl_ffi.mjs", "local_timezone")
 fn local_timezone() -> option.Option(String)
+
+// ---------------------------------------------------------------------------
+// gleam_time interoperability
+// ---------------------------------------------------------------------------
+
+/// Convert birl Time to gleam_time Timestamp.
+///
+/// Note: This conversion loses offset/timezone information since Timestamp
+/// represents an absolute point in time (like UTC).
+pub fn to_timestamp(value: Time) -> timestamp.Timestamp {
+  let Time(wall_time: t, ..) = value
+  // birl uses microseconds, gleam_time uses seconds + nanoseconds
+  let seconds = t / 1_000_000
+  let nanoseconds = { t % 1_000_000 } * 1000
+  timestamp.from_unix_seconds_and_nanoseconds(seconds, nanoseconds)
+}
+
+/// Convert gleam_time Timestamp to birl Time.
+///
+/// The resulting Time will be in UTC with no timezone information.
+pub fn from_timestamp(ts: timestamp.Timestamp) -> Time {
+  let #(seconds, nanoseconds) = timestamp.to_unix_seconds_and_nanoseconds(ts)
+  let microseconds = seconds * 1_000_000 + nanoseconds / 1000
+  Time(microseconds, 0, option.Some("Etc/UTC"), option.None)
+}
+
+/// Convert birl Day to gleam_time calendar.Date.
+pub fn day_to_date(day: Day) -> calendar.Date {
+  let assert Ok(month) = calendar.month_from_int(day.month)
+  calendar.Date(day.year, month, day.date)
+}
+
+/// Convert gleam_time calendar.Date to birl Day.
+pub fn date_to_day(date: calendar.Date) -> Day {
+  Day(date.year, calendar.month_to_int(date.month), date.day)
+}
+
+/// Convert birl TimeOfDay to gleam_time calendar.TimeOfDay.
+///
+/// Note: birl stores milliseconds while gleam_time stores nanoseconds,
+/// so some precision may be gained (with zeros in the nanosecond places).
+pub fn time_of_day_to_calendar(tod: TimeOfDay) -> calendar.TimeOfDay {
+  calendar.TimeOfDay(
+    tod.hour,
+    tod.minute,
+    tod.second,
+    tod.milli_second * 1_000_000,
+  )
+}
+
+/// Convert gleam_time calendar.TimeOfDay to birl TimeOfDay.
+///
+/// Note: gleam_time stores nanoseconds while birl stores milliseconds,
+/// so sub-millisecond precision will be lost.
+pub fn calendar_to_time_of_day(tod: calendar.TimeOfDay) -> TimeOfDay {
+  TimeOfDay(tod.hours, tod.minutes, tod.seconds, tod.nanoseconds / 1_000_000)
+}
