@@ -295,9 +295,14 @@ const milli_second_units = [
 ]
 
 const units = [
-  #(Year, year_units), #(Month, month_units), #(Week, week_units),
-  #(Day, day_units), #(Hour, hour_units), #(Minute, minute_units),
-  #(Second, second_units), #(MilliSecond, milli_second_units),
+  #(Year, year_units),
+  #(Month, month_units),
+  #(Week, week_units),
+  #(Day, day_units),
+  #(Hour, hour_units),
+  #(Minute, minute_units),
+  #(Second, second_units),
+  #(MilliSecond, milli_second_units),
 ]
 
 /// you can use this function to create a new duration using expressions like:

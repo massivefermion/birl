@@ -298,71 +298,74 @@ pub fn parse(value: String) -> Result(Time, Nil) {
   let assert Ok(offset_pattern) = regexp.from_string("(.*)([+|\\-].*)")
   let value = string.trim(value)
 
-  use #(day_string, offsetted_time_string) <- result.try(case
-    string.split(value, "T"),
-    string.split(value, "t"),
-    string.split(value, " ")
-  {
-    [day_string, time_string], _, _
-    | _, [day_string, time_string], _
-    | _, _, [day_string, time_string]
-    -> Ok(#(day_string, time_string))
-    [_], [_], [_] -> Ok(#(value, "00"))
-    _, _, _ -> Error(Nil)
-  })
+  use #(day_string, offsetted_time_string) <- result.try(
+    case
+      string.split(value, "T"),
+      string.split(value, "t"),
+      string.split(value, " ")
+    {
+      [day_string, time_string], _, _
+      | _, [day_string, time_string], _
+      | _, _, [day_string, time_string]
+      -> Ok(#(day_string, time_string))
+      [_], [_], [_] -> Ok(#(value, "00"))
+      _, _, _ -> Error(Nil)
+    },
+  )
 
   let day_string = string.trim(day_string)
   let offsetted_time_string = string.trim(offsetted_time_string)
 
-  use #(day_string, time_string, offset_string) <- result.try(case
-    string.ends_with(offsetted_time_string, "Z")
-    || string.ends_with(offsetted_time_string, "z")
-  {
-    True ->
-      Ok(#(day_string, string.drop_end(offsetted_time_string, 1), "+00:00"))
-    False ->
-      case regexp.scan(offset_pattern, offsetted_time_string) {
-        [
-          regexp.Match(
-            _,
-            [option.Some(time_string), option.Some(offset_string)],
-          ),
-        ] -> Ok(#(day_string, time_string, offset_string))
-        _ ->
-          case regexp.scan(offset_pattern, day_string) {
-            [
-              regexp.Match(
-                _,
-                [option.Some(day_string), option.Some(offset_string)],
-              ),
-            ] -> Ok(#(day_string, "00", offset_string))
-            _ -> Error(Nil)
-          }
-      }
-  })
+  use #(day_string, time_string, offset_string) <- result.try(
+    case
+      string.ends_with(offsetted_time_string, "Z")
+      || string.ends_with(offsetted_time_string, "z")
+    {
+      True ->
+        Ok(#(day_string, string.drop_end(offsetted_time_string, 1), "+00:00"))
+      False ->
+        case regexp.scan(offset_pattern, offsetted_time_string) {
+          [
+            regexp.Match(
+              _,
+              [option.Some(time_string), option.Some(offset_string)],
+            ),
+          ] -> Ok(#(day_string, time_string, offset_string))
+          _ ->
+            case regexp.scan(offset_pattern, day_string) {
+              [
+                regexp.Match(
+                  _,
+                  [option.Some(day_string), option.Some(offset_string)],
+                ),
+              ] -> Ok(#(day_string, "00", offset_string))
+              _ -> Error(Nil)
+            }
+        }
+    },
+  )
 
   let time_string = string.replace(time_string, ":", "")
-  use #(time_string, milli_seconds_result) <- result.try(case
-    string.split(time_string, "."),
-    string.split(time_string, ",")
-  {
-    [_], [_] -> {
-      Ok(#(time_string, Ok(0)))
-    }
-    [time_string, milli_seconds_string], [_]
-    | [_], [time_string, milli_seconds_string]
-    -> {
-      Ok(#(
-        time_string,
-        milli_seconds_string
-          |> string.slice(0, 3)
-          |> string.pad_end(3, "0")
-          |> int.parse,
-      ))
-    }
+  use #(time_string, milli_seconds_result) <- result.try(
+    case string.split(time_string, "."), string.split(time_string, ",") {
+      [_], [_] -> {
+        Ok(#(time_string, Ok(0)))
+      }
+      [time_string, milli_seconds_string], [_]
+      | [_], [time_string, milli_seconds_string]
+      -> {
+        Ok(#(
+          time_string,
+          milli_seconds_string
+            |> string.slice(0, 3)
+            |> string.pad_end(3, "0")
+            |> int.parse,
+        ))
+      }
 
-    _, _ -> Error(Nil)
-  })
+      _, _ -> Error(Nil)
+    },
+  )
 
   case milli_seconds_result {
     Ok(milli_seconds) -> {
@@ -412,44 +415,45 @@ pub fn parse_time_of_day(value: String) -> Result(#(TimeOfDay, String), Nil) {
     _, _ -> value
   }
 
-  use #(time_string, offset_string) <- result.try(case
-    string.ends_with(time_string, "Z") || string.ends_with(time_string, "z")
-  {
-    True -> Ok(#(string.drop_end(value, 1), "+00:00"))
-    False ->
-      case regexp.scan(offset_pattern, value) {
-        [
-          regexp.Match(
-            _,
-            [option.Some(time_string), option.Some(offset_string)],
-          ),
-        ] -> Ok(#(time_string, offset_string))
-        _ -> Error(Nil)
-      }
-  })
+  use #(time_string, offset_string) <- result.try(
+    case
+      string.ends_with(time_string, "Z") || string.ends_with(time_string, "z")
+    {
+      True -> Ok(#(string.drop_end(value, 1), "+00:00"))
+      False ->
+        case regexp.scan(offset_pattern, value) {
+          [
+            regexp.Match(
+              _,
+              [option.Some(time_string), option.Some(offset_string)],
+            ),
+          ] -> Ok(#(time_string, offset_string))
+          _ -> Error(Nil)
+        }
+    },
+  )
 
   let time_string = string.replace(time_string, ":", "")
 
-  use #(time_string, milli_seconds_result) <- result.try(case
-    string.split(time_string, "."),
-    string.split(time_string, ",")
-  {
-    [_], [_] -> {
-      Ok(#(time_string, Ok(0)))
-    }
-    [time_string, milli_seconds_string], [_]
-    | [_], [time_string, milli_seconds_string]
-    -> {
-      Ok(#(
-        time_string,
-        milli_seconds_string
-          |> string.slice(0, 3)
-          |> string.pad_end(3, "0")
-          |> int.parse,
-      ))
-    }
-    _, _ -> Error(Nil)
-  })
+  use #(time_string, milli_seconds_result) <- result.try(
+    case string.split(time_string, "."), string.split(time_string, ",") {
+      [_], [_] -> {
+        Ok(#(time_string, Ok(0)))
+      }
+      [time_string, milli_seconds_string], [_]
+      | [_], [time_string, milli_seconds_string]
+      -> {
+        Ok(#(
+          time_string,
+          milli_seconds_string
+            |> string.slice(0, 3)
+            |> string.pad_end(3, "0")
+            |> int.parse,
+        ))
+      }
+      _, _ -> Error(Nil)
+    },
+  )
 
   case milli_seconds_result {
     Ok(milli_seconds) -> {
@@ -479,26 +483,25 @@ pub fn parse_naive_time_of_day(
 
   let time_string = string.replace(time_string, ":", "")
 
-  use #(time_string, milli_seconds_result) <- result.try(case
-    string.split(time_string, "."),
-    string.split(time_string, ",")
-  {
-    [_], [_] -> {
-      Ok(#(time_string, Ok(0)))
-    }
-    [time_string, milli_seconds_string], [_]
-    | [_], [time_string, milli_seconds_string]
-    -> {
-      Ok(#(
-        time_string,
-        milli_seconds_string
-          |> string.slice(0, 3)
-          |> string.pad_end(3, "0")
-          |> int.parse,
-      ))
-    }
-    _, _ -> Error(Nil)
-  })
+  use #(time_string, milli_seconds_result) <- result.try(
+    case string.split(time_string, "."), string.split(time_string, ",") {
+      [_], [_] -> {
+        Ok(#(time_string, Ok(0)))
+      }
+      [time_string, milli_seconds_string], [_]
+      | [_], [time_string, milli_seconds_string]
+      -> {
+        Ok(#(
+          time_string,
+          milli_seconds_string
+            |> string.slice(0, 3)
+            |> string.pad_end(3, "0")
+            |> int.parse,
+        ))
+      }
+      _, _ -> Error(Nil)
+    },
+  )
 
   case milli_seconds_result {
     Ok(milli_seconds) -> {
@@ -579,42 +582,43 @@ pub fn to_naive(value: Time) -> String {
 pub fn from_naive(value: String) -> Result(Time, Nil) {
   let value = string.trim(value)
 
-  use #(day_string, time_string) <- result.try(case
-    string.split(value, "T"),
-    string.split(value, "t"),
-    string.split(value, " ")
-  {
-    [day_string, time_string], _, _
-    | _, [day_string, time_string], _
-    | _, _, [day_string, time_string]
-    -> Ok(#(day_string, time_string))
-    [_], [_], [_] -> Ok(#(value, "00"))
-    _, _, _ -> Error(Nil)
-  })
+  use #(day_string, time_string) <- result.try(
+    case
+      string.split(value, "T"),
+      string.split(value, "t"),
+      string.split(value, " ")
+    {
+      [day_string, time_string], _, _
+      | _, [day_string, time_string], _
+      | _, _, [day_string, time_string]
+      -> Ok(#(day_string, time_string))
+      [_], [_], [_] -> Ok(#(value, "00"))
+      _, _, _ -> Error(Nil)
+    },
+  )
 
   let day_string = string.trim(day_string)
   let time_string = string.trim(time_string)
 
   let time_string = string.replace(time_string, ":", "")
-  use #(time_string, milli_seconds_result) <- result.try(case
-    string.split(time_string, "."),
-    string.split(time_string, ",")
-  {
-    [_], [_] -> Ok(#(time_string, Ok(0)))
+  use #(time_string, milli_seconds_result) <- result.try(
+    case string.split(time_string, "."), string.split(time_string, ",") {
+      [_], [_] -> Ok(#(time_string, Ok(0)))
 
-    [time_string, milli_seconds_string], [_]
-    | [_], [time_string, milli_seconds_string]
-    ->
-      Ok(#(
-        time_string,
-        milli_seconds_string
-          |> string.slice(0, 3)
-          |> string.pad_end(3, "0")
-          |> int.parse,
-      ))
+      [time_string, milli_seconds_string], [_]
+      | [_], [time_string, milli_seconds_string]
+      ->
+        Ok(#(
+          time_string,
+          milli_seconds_string
+            |> string.slice(0, 3)
+            |> string.pad_end(3, "0")
+            |> int.parse,
+        ))
 
-    _, _ -> Error(Nil)
-  })
+      _, _ -> Error(Nil)
+    },
+  )
 
   case milli_seconds_result {
     Ok(milli_seconds) -> {
@@ -909,8 +913,12 @@ pub fn difference(a: Time, b: Time) -> duration.Duration {
 }
 
 const string_to_units = [
-  #("year", duration.Year), #("month", duration.Month), #("week", duration.Week),
-  #("day", duration.Day), #("hour", duration.Hour), #("minute", duration.Minute),
+  #("year", duration.Year),
+  #("month", duration.Month),
+  #("week", duration.Week),
+  #("day", duration.Day),
+  #("hour", duration.Hour),
+  #("minute", duration.Minute),
   #("second", duration.Second),
 ]
 
@@ -957,8 +965,12 @@ pub fn parse_relative(origin: Time, legible_difference: String) {
 }
 
 const units_to_string = [
-  #(duration.Year, "year"), #(duration.Month, "month"), #(duration.Week, "week"),
-  #(duration.Day, "day"), #(duration.Hour, "hour"), #(duration.Minute, "minute"),
+  #(duration.Year, "year"),
+  #(duration.Month, "month"),
+  #(duration.Week, "week"),
+  #(duration.Day, "day"),
+  #(duration.Hour, "hour"),
+  #(duration.Minute, "minute"),
   #(duration.Second, "second"),
 ]
 
@@ -1596,18 +1608,28 @@ fn month_from_int(month: Int) -> Result(Month, Nil) {
 }
 
 const weekday_strings = [
-  #(Mon, #("Monday", "Mon")), #(Tue, #("Tuesday", "Tue")),
-  #(Wed, #("Wednesday", "Wed")), #(Thu, #("Thursday", "Thu")),
-  #(Fri, #("Friday", "Fri")), #(Sat, #("Saturday", "Sat")),
+  #(Mon, #("Monday", "Mon")),
+  #(Tue, #("Tuesday", "Tue")),
+  #(Wed, #("Wednesday", "Wed")),
+  #(Thu, #("Thursday", "Thu")),
+  #(Fri, #("Friday", "Fri")),
+  #(Sat, #("Saturday", "Sat")),
   #(Sun, #("Sunday", "Sun")),
 ]
 
 const month_strings = [
-  #(Jan, #("January", "Jan")), #(Feb, #("February", "Feb")),
-  #(Mar, #("March", "Mar")), #(Apr, #("April", "Apr")), #(May, #("May", "May")),
-  #(Jun, #("June", "Jun")), #(Jul, #("July", "Jul")), #(Aug, #("August", "Aug")),
-  #(Sep, #("September", "Sep")), #(Oct, #("October", "Oct")),
-  #(Nov, #("November", "Nov")), #(Dec, #("December", "Dec")),
+  #(Jan, #("January", "Jan")),
+  #(Feb, #("February", "Feb")),
+  #(Mar, #("March", "Mar")),
+  #(Apr, #("April", "Apr")),
+  #(May, #("May", "May")),
+  #(Jun, #("June", "Jun")),
+  #(Jul, #("July", "Jul")),
+  #(Aug, #("August", "Aug")),
+  #(Sep, #("September", "Sep")),
+  #(Oct, #("October", "Oct")),
+  #(Nov, #("November", "Nov")),
+  #(Dec, #("December", "Dec")),
 ]
 
 @external(erlang, "birl_ffi", "now")
