@@ -2,7 +2,7 @@ name = "birl"
 version = "1.9.0"
 
 description = "Date / Time handling for Gleam"
-gleam = ">= 0.32.0"
+gleam = ">= 1.5.0"
 internal_modules = ["birl/zones"]
 licences = ["Apache-2.0"]
 repository = { type = "github", user = "massivefermion", repo = "birl" }
