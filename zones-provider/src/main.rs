@@ -4,7 +4,7 @@ use std::io::{self, Cursor, Write};
 use std::str::from_utf8;
 
 use flate2::read::GzDecoder;
-use parse_zoneinfo::line::{Line, LineParser};
+use parse_zoneinfo::line::Line;
 use parse_zoneinfo::table::TableBuilder;
 use regex::Regex;
 use reqwest::Client;
@@ -70,10 +70,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             .map(|line| strip_comments(line.to_string()))
             .collect::<Vec<_>>();
 
-        let parser = LineParser::default();
         let mut builder = TableBuilder::new();
         for line in &lines {
-            match parser.parse_str(line).unwrap() {
+            match Line::new(line).unwrap() {
                 Line::Zone(zone) => builder.add_zone_line(zone).unwrap(),
                 Line::Continuation(cont) => builder.add_continuation_line(cont).unwrap(),
                 Line::Rule(rule) => builder.add_rule_line(rule).unwrap(),
