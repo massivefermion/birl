@@ -7,11 +7,10 @@ import gleam/result
 import gleam/string
 import gleam/time/duration as time_duration
 
-/// Duration represents a span of time in microseconds.
-/// This is kept in microseconds for backward compatibility with existing birl code.
-pub type Duration {
-  Duration(Int)
-}
+/// Duration is now an alias for gleam_time's Duration type.
+/// It represents a span of time stored in nanoseconds.
+pub type Duration =
+  time_duration.Duration
 
 pub type Unit {
   NanoSecond
@@ -27,79 +26,77 @@ pub type Unit {
 }
 
 pub fn add(a: Duration, b: Duration) -> Duration {
-  let Duration(a) = a
-  let Duration(b) = b
-  Duration(a + b)
+  time_duration.add(a, b)
 }
 
 pub fn subtract(a: Duration, b: Duration) -> Duration {
-  let Duration(a) = a
-  let Duration(b) = b
-  Duration(a - b)
+  time_duration.difference(b, a)
 }
 
 pub fn scale_up(value: Duration, factor: Int) -> Duration {
-  let Duration(value) = value
-  Duration(value * factor)
+  let #(seconds, nanoseconds) = time_duration.to_seconds_and_nanoseconds(value)
+  let total_nanos = { seconds * 1_000_000_000 + nanoseconds } * factor
+  time_duration.nanoseconds(total_nanos)
 }
 
 pub fn scale_down(value: Duration, factor: Int) -> Duration {
-  let Duration(value) = value
-  Duration(value / factor)
+  let #(seconds, nanoseconds) = time_duration.to_seconds_and_nanoseconds(value)
+  let total_nanos = { seconds * 1_000_000_000 + nanoseconds } / factor
+  time_duration.nanoseconds(total_nanos)
 }
 
-/// Create a duration from nanoseconds.
-/// Note: birl Duration uses microsecond precision internally,
-/// so sub-microsecond precision is lost.
 pub fn nano_seconds(value: Int) -> Duration {
-  Duration(value / 1000)
+  time_duration.nanoseconds(value)
 }
 
 pub fn micro_seconds(value: Int) -> Duration {
-  Duration(value)
+  time_duration.nanoseconds(value * 1000)
 }
 
 pub fn milli_seconds(value: Int) -> Duration {
-  Duration(value * milli_second)
+  time_duration.nanoseconds(value * milli_second)
 }
 
 pub fn seconds(value: Int) -> Duration {
-  Duration(value * second)
+  time_duration.seconds(value)
 }
 
 pub fn minutes(value: Int) -> Duration {
-  Duration(value * minute)
+  time_duration.minutes(value)
 }
 
 pub fn hours(value: Int) -> Duration {
-  Duration(value * hour)
+  time_duration.hours(value)
 }
 
 pub fn days(value: Int) -> Duration {
-  Duration(value * day)
+  time_duration.nanoseconds(value * day)
 }
 
 pub fn weeks(value: Int) -> Duration {
-  Duration(value * week)
+  time_duration.nanoseconds(value * week)
 }
 
 pub fn months(value: Int) -> Duration {
-  Duration(value * month)
+  time_duration.nanoseconds(value * month)
 }
 
 pub fn years(value: Int) -> Duration {
-  Duration(value * year)
+  time_duration.nanoseconds(value * year)
 }
 
 pub fn compare(a: Duration, b: Duration) -> order.Order {
-  let Duration(dta) = a
-  let Duration(dtb) = b
+  let #(sa, na) = time_duration.to_seconds_and_nanoseconds(a)
+  let #(sb, nb) = time_duration.to_seconds_and_nanoseconds(b)
+  let total_a = sa * 1_000_000_000 + na
+  let total_b = sb * 1_000_000_000 + nb
+  int.compare(total_a, total_b)
+}
 
-  case dta == dtb, dta < dtb {
-    True, _ -> order.Eq
-    _, True -> order.Lt
-    _, False -> order.Gt
-  }
+/// Convert duration to total nanoseconds (internal helper)
+fn to_nanoseconds(d: Duration) -> Int {
+  let #(seconds, nanoseconds) = time_duration.to_seconds_and_nanoseconds(d)
+  seconds * 1_000_000_000 + nanoseconds
 }
 
 /// use this if you need short durations where a year just means 365 days and a month just means 30 days
@@ -107,8 +104,8 @@ pub fn new(values: List(#(Int, Unit))) -> Duration {
   values
   |> list.fold(0, fn(total, current) {
     case current {
-      #(amount, NanoSecond) -> total + amount / 1000
-      #(amount, MicroSecond) -> total + amount
+      #(amount, NanoSecond) -> total + amount
+      #(amount, MicroSecond) -> total + amount * 1000
       #(amount, MilliSecond) -> total + amount * milli_second
       #(amount, Second) -> total + amount * second
       #(amount, Minute) -> total + amount * minute
@@ -119,7 +116,7 @@ pub fn new(values: List(#(Int, Unit))) -> Duration {
       #(amount, Year) -> total + amount * year
     }
   })
-  |> Duration
+  |> time_duration.nanoseconds
 }
 
 /// use this if you need very long durations where small inaccuracies could lead to large errors
@@ -127,8 +124,8 @@ pub fn accurate_new(values: List(#(Int, Unit))) -> Duration {
   values
   |> list.fold(0, fn(total, current) {
     case current {
-      #(amount, NanoSecond) -> total + amount / 1000
-      #(amount, MicroSecond) -> total + amount
+      #(amount, NanoSecond) -> total + amount
+      #(amount, MicroSecond) -> total + amount * 1000
       #(amount, MilliSecond) -> total + amount * milli_second
       #(amount, Second) -> total + amount * second
       #(amount, Minute) -> total + amount * minute
@@ -139,12 +136,12 @@ pub fn accurate_new(values: List(#(Int, Unit))) -> Duration {
       #(amount, Year) -> total + amount * accurate_year
     }
   })
-  |> Duration
+  |> time_duration.nanoseconds
 }
 
 /// use this if you need short durations where a year just means 365 days and a month just means 30 days
 pub fn decompose(duration: Duration) -> List(#(Int, Unit)) {
-  let Duration(value) = duration
+  let value = to_nanoseconds(duration)
   let absolute_value = int.absolute_value(value)
   let #(years, remaining) = extract(absolute_value, year)
   let #(months, remaining) = extract(remaining, month)
@@ -154,6 +151,7 @@ pub fn decompose(duration: Duration) -> List(#(Int, Unit)) {
   let #(minutes, remaining) = extract(remaining, minute)
   let #(seconds, remaining) = extract(remaining, second)
   let #(milli_seconds, remaining) = extract(remaining, milli_second)
+  let #(micro_seconds, remaining) = extract(remaining, 1000)
 
   [
     #(years, Year),
@@ -164,7 +162,8 @@ pub fn decompose(duration: Duration) -> List(#(Int, Unit)) {
     #(minutes, Minute),
     #(seconds, Second),
     #(milli_seconds, MilliSecond),
-    #(remaining, MicroSecond),
+    #(micro_seconds, MicroSecond),
+    #(remaining, NanoSecond),
   ]
   |> list.filter(fn(item) { item.0 > 0 })
   |> list.map(fn(item) {
@@ -177,7 +176,7 @@ pub fn decompose(duration: Duration) -> List(#(Int, Unit)) {
 
 /// use this if you need very long durations where small inaccuracies could lead to large errors
 pub fn accurate_decompose(duration: Duration) -> List(#(Int, Unit)) {
-  let Duration(value) = duration
+  let value = to_nanoseconds(duration)
   let absolute_value = int.absolute_value(value)
   let #(years, remaining) = extract(absolute_value, accurate_year)
   let #(months, remaining) = extract(remaining, accurate_month)
@@ -187,6 +186,7 @@ pub fn accurate_decompose(duration: Duration) -> List(#(Int, Unit)) {
   let #(minutes, remaining) = extract(remaining, minute)
   let #(seconds, remaining) = extract(remaining, second)
   let #(milli_seconds, remaining) = extract(remaining, milli_second)
+  let #(micro_seconds, remaining) = extract(remaining, 1000)
 
   [
     #(years, Year),
@@ -197,7 +197,8 @@ pub fn accurate_decompose(duration: Duration) -> List(#(Int, Unit)) {
     #(minutes, Minute),
     #(seconds, Second),
     #(milli_seconds, MilliSecond),
-    #(remaining, MicroSecond),
+    #(micro_seconds, MicroSecond),
+    #(remaining, NanoSecond),
   ]
   |> list.filter(fn(item) { item.0 > 0 })
   |> list.map(fn(item) {
@@ -218,7 +219,7 @@ pub fn accurate_decompose(duration: Duration) -> List(#(Int, Unit)) {
 ///   - `blur_to(days(20), Month)` ->  `1`
 pub fn blur_to(duration: Duration, unit: Unit) -> Int {
   let unit_value = unit_values(unit)
-  let Duration(value) = duration
+  let value = to_nanoseconds(duration)
   let #(unit_counts, remaining) = extract(value, unit_value)
   case remaining >= unit_value * 2 / 3 {
     True -> unit_counts + 1
@@ -233,25 +234,26 @@ pub fn blur(duration: Duration) -> #(Int, Unit) {
   |> inner_blur
 }
 
-const milli_second = 1000
+// All constants are now in nanoseconds
+const milli_second = 1_000_000
 
-const second = 1_000_000
+const second = 1_000_000_000
 
-const minute = 60_000_000
+const minute = 60_000_000_000
 
-const hour = 3_600_000_000
+const hour = 3_600_000_000_000
 
-const day = 86_400_000_000
+const day = 86_400_000_000_000
 
-const week = 604_800_000_000
+const week = 604_800_000_000_000
 
-const month = 2_592_000_000_000
+const month = 2_592_000_000_000_000
 
-const year = 31_536_000_000_000
+const year = 31_536_000_000_000_000
 
-const accurate_month = 2_629_746_000_000
+const accurate_month = 2_629_746_000_000_000
 
-const accurate_year = 31_556_952_000_000
+const accurate_year = 31_556_952_000_000_000
 
 fn unit_values(unit: Unit) {
   case unit {
@@ -263,15 +265,14 @@ fn unit_values(unit: Unit) {
     Minute -> minute
     Second -> second
     MilliSecond -> milli_second
-    MicroSecond -> 1
-    // NanoSecond is sub-microsecond, so we return 1 and handle it specially in blur
+    MicroSecond -> 1000
     NanoSecond -> 1
   }
 }
 
 fn inner_blur(values: List(#(Int, Unit))) -> #(Int, Unit) {
   case values {
-    [] -> #(0, MicroSecond)
+    [] -> #(0, NanoSecond)
     [single] -> single
     [smaller, larger, ..rest] -> {
       let smaller_unit_value = unit_values(smaller.1)
@@ -342,7 +343,7 @@ const units = [
 ///
 ///     MilliSecond:  ms, Msec, mSecs, milliSecond, MilliSecond, ...
 ///
-/// numbers with no unit are considered as microseconds.
+/// numbers with no unit are considered as nanoseconds.
 /// specifying `accurate:` is equivalent to using `accurate_new`.
 pub fn parse(expression: String) -> Result(Duration, Nil) {
   let assert Ok(re) = regexp.from_string("([+|\\-])?\\s*(\\d+)\\s*(\\w+)?")
@@ -367,8 +368,8 @@ pub fn parse(expression: String) -> Result(Duration, Nil) {
           use amount <- result.try(int.parse(amount_string))
 
           case sign_option {
-            option.Some("-") -> Ok(#(-1 * amount, MicroSecond))
-            option.None | option.Some("+") -> Ok(#(amount, MicroSecond))
+            option.Some("-") -> Ok(#(-1 * amount, NanoSecond))
+            option.None | option.Some("+") -> Ok(#(amount, NanoSecond))
             option.Some(_) -> Error(Nil)
           }
         }
@@ -407,23 +408,23 @@ fn extract(duration: Int, unit_value: Int) -> #(Int, Int) {
 }
 
 // ---------------------------------------------------------------------------
-// gleam_time interoperability
+// gleam_time interoperability (deprecated — Duration is now gleam_time Duration)
 // ---------------------------------------------------------------------------
 
 /// Convert birl Duration to gleam_time Duration.
 ///
-/// birl uses microseconds internally, while gleam_time uses nanoseconds.
+/// Deprecated: Duration is now the same type as gleam_time Duration.
+/// This function is kept for backward compatibility and is a no-op.
+@deprecated("Duration is now gleam_time's Duration type. This function is a no-op.")
 pub fn to_gleam_duration(d: Duration) -> time_duration.Duration {
-  let Duration(microseconds) = d
-  // Convert microseconds to nanoseconds
-  time_duration.nanoseconds(microseconds * 1000)
+  d
 }
 
 /// Convert gleam_time Duration to birl Duration.
 ///
-/// gleam_time uses nanoseconds internally, while birl uses microseconds.
-/// Sub-microsecond precision will be lost.
+/// Deprecated: Duration is now the same type as gleam_time Duration.
+/// This function is kept for backward compatibility and is a no-op.
+@deprecated("Duration is now gleam_time's Duration type. This function is a no-op.")
 pub fn from_gleam_duration(d: time_duration.Duration) -> Duration {
-  let #(seconds, nanoseconds) = time_duration.to_seconds_and_nanoseconds(d)
-  Duration(seconds * 1_000_000 + nanoseconds / 1000)
+  d
 }

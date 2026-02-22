@@ -977,10 +977,7 @@ pub fn difference(a: Time, b: Time) -> duration.Duration {
       let diff_micros = ma - mb
       duration.micro_seconds(diff_micros)
     }
-    _, _ -> {
-      let diff = timestamp.difference(tsa, tsb)
-      duration.from_gleam_duration(diff)
-    }
+    _, _ -> timestamp.difference(tsa, tsb)
   }
 }
 
@@ -1080,11 +1077,10 @@ pub fn legible_difference(a: Time, b: Time) -> String {
 pub fn add(value: Time, dur: duration.Duration) -> Time {
   let Time(timestamp: ts, offset: o, timezone: timezone, monotonic_time: mt) =
     value
-  let gleam_dur = duration.to_gleam_duration(dur)
-  let new_ts = timestamp.add(ts, gleam_dur)
+  let new_ts = timestamp.add(ts, dur)
 
   // Also update monotonic time if present (it's in microseconds)
-  let duration.Duration(dur_micros) = dur
+  let dur_micros = duration_to_microseconds(dur)
   let new_mt = option.map(mt, fn(m) { m + dur_micros })
 
   Time(timestamp: new_ts, offset: o, timezone: timezone, monotonic_time: new_mt)
@@ -1093,15 +1089,13 @@ pub fn add(value: Time, dur: duration.Duration) -> Time {
 pub fn subtract(value: Time, dur: duration.Duration) -> Time {
   let Time(timestamp: ts, offset: o, timezone: timezone, monotonic_time: mt) =
     value
-  let gleam_dur = duration.to_gleam_duration(dur)
   // gleam_time doesn't have subtract, so negate the duration and add
   // difference(a, b) = b - a, so difference(dur, 0) = 0 - dur = -dur
-  let negated_dur =
-    time_duration.difference(gleam_dur, time_duration.seconds(0))
+  let negated_dur = time_duration.difference(dur, time_duration.seconds(0))
   let new_ts = timestamp.add(ts, negated_dur)
 
   // Also update monotonic time if present (it's in microseconds)
-  let duration.Duration(dur_micros) = dur
+  let dur_micros = duration_to_microseconds(dur)
   let new_mt = option.map(mt, fn(m) { m - dur_micros })
 
   Time(timestamp: new_ts, offset: o, timezone: timezone, monotonic_time: new_mt)
@@ -1225,9 +1219,8 @@ pub fn range(from a: Time, to b: option.Option(Time), step s: duration.Duration)
     option.Some(b) ->
       ranger.create(
         validate: fn(_) { True },
-        negate_step: fn(duration) {
-          let duration.Duration(value) = duration
-          duration.Duration(-1 * value)
+        negate_step: fn(dur) {
+          time_duration.difference(dur, time_duration.seconds(0))
         },
         add: add,
         compare: compare,
@@ -1481,6 +1474,11 @@ fn parse_offset(offset: String) -> Result(Int, Nil) {
       }
     _ -> Error(Nil)
   }
+}
+
+fn duration_to_microseconds(dur: time_duration.Duration) -> Int {
+  let #(seconds, nanoseconds) = time_duration.to_seconds_and_nanoseconds(dur)
+  seconds * 1_000_000 + nanoseconds / 1000
 }
 
 fn generate_offset(offset: time_duration.Duration) -> Result(String, Nil) {

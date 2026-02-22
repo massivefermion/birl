@@ -339,7 +339,7 @@ pub fn day_to_date_test() {
 }
 
 pub fn time_of_day_roundtrip_test() {
-  let tod = birl.TimeOfDay(14, 30, 45, 123)
+  let tod = birl.TimeOfDay(14, 30, 45, 123_000_000)
   let calendar_tod = birl.time_of_day_to_calendar(tod)
   let back = birl.calendar_to_time_of_day(calendar_tod)
   tod
@@ -347,7 +347,7 @@ pub fn time_of_day_roundtrip_test() {
 }
 
 pub fn time_of_day_to_calendar_test() {
-  let tod = birl.TimeOfDay(14, 30, 45, 123)
+  let tod = birl.TimeOfDay(14, 30, 45, 123_000_000)
   let calendar_tod = birl.time_of_day_to_calendar(tod)
   calendar_tod.hours
   |> should.equal(14)
@@ -355,7 +355,7 @@ pub fn time_of_day_to_calendar_test() {
   |> should.equal(30)
   calendar_tod.seconds
   |> should.equal(45)
-  // 123 milliseconds = 123_000_000 nanoseconds
+  // 123_000_000 nanoseconds = 123 milliseconds
   calendar_tod.nanoseconds
   |> should.equal(123_000_000)
 }
