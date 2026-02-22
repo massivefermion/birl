@@ -1,4 +1,7 @@
 import gleam/order
+import gleam/time/calendar
+import gleam/time/duration as time_duration
+import gleam/time/timestamp
 import gleeunit
 import gleeunit/should
 
@@ -273,4 +276,86 @@ pub fn blur_test() {
   duration.seconds(60 * 60 * 24 * 400)
   |> duration.blur
   |> should.equal(#(1, duration.Year))
+}
+
+// `gleam_time` interoperability tests
+
+pub fn timestamp_roundtrip_test() {
+  let now = birl.utc_now()
+  let ts = birl.to_timestamp(now)
+  let back = birl.from_timestamp(ts)
+  // Should be equal within microsecond precision
+  birl.to_unix_micro(now)
+  |> should.equal(birl.to_unix_micro(back))
+}
+
+pub fn timestamp_epoch_test() {
+  let ts = birl.to_timestamp(birl.unix_epoch())
+  let #(seconds, nanoseconds) = timestamp.to_unix_seconds_and_nanoseconds(ts)
+  seconds
+  |> should.equal(0)
+  nanoseconds
+  |> should.equal(0)
+}
+
+pub fn duration_roundtrip_test() {
+  let d = duration.hours(2) |> duration.add(duration.minutes(30))
+  let gleam_d = duration.to_gleam_duration(d)
+  let back = duration.from_gleam_duration(gleam_d)
+  d
+  |> should.equal(back)
+}
+
+pub fn duration_conversion_test() {
+  // 1 second = 1_000_000 microseconds in birl
+  // 1 second = 1_000_000_000 nanoseconds in gleam_time
+  let d = duration.seconds(1)
+  let gleam_d = duration.to_gleam_duration(d)
+  let #(seconds, nanoseconds) =
+    time_duration.to_seconds_and_nanoseconds(gleam_d)
+  seconds
+  |> should.equal(1)
+  nanoseconds
+  |> should.equal(0)
+}
+
+pub fn day_date_roundtrip_test() {
+  let day = birl.Day(2024, 6, 15)
+  let date = birl.day_to_date(day)
+  let back = birl.date_to_day(date)
+  day
+  |> should.equal(back)
+}
+
+pub fn day_to_date_test() {
+  let day = birl.Day(2024, 1, 15)
+  let date = birl.day_to_date(day)
+  date.year
+  |> should.equal(2024)
+  date.month
+  |> should.equal(calendar.January)
+  date.day
+  |> should.equal(15)
+}
+
+pub fn time_of_day_roundtrip_test() {
+  let tod = birl.TimeOfDay(14, 30, 45, 123)
+  let calendar_tod = birl.time_of_day_to_calendar(tod)
+  let back = birl.calendar_to_time_of_day(calendar_tod)
+  tod
+  |> should.equal(back)
+}
+
+pub fn time_of_day_to_calendar_test() {
+  let tod = birl.TimeOfDay(14, 30, 45, 123)
+  let calendar_tod = birl.time_of_day_to_calendar(tod)
+  calendar_tod.hours
+  |> should.equal(14)
+  calendar_tod.minutes
+  |> should.equal(30)
+  calendar_tod.seconds
+  |> should.equal(45)
+  // 123 milliseconds = 123_000_000 nanoseconds
+  calendar_tod.nanoseconds
+  |> should.equal(123_000_000)
 }
