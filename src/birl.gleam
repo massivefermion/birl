@@ -155,25 +155,43 @@ pub fn to_naive_date_string(value: Time) -> String {
 pub fn to_time_string(value: Time) -> String {
   let #(_, #(hour, minute, second, milli_second), offset) = to_parts(value)
   pad2(hour)
-  <> ":" <> pad2(minute)
-  <> ":" <> pad2(second)
-  <> "." <> pad3(milli_second)
+  <> ":"
+  <> pad2(minute)
+  <> ":"
+  <> pad2(second)
+  <> "."
+  <> pad3(milli_second)
   <> offset
 }
 
 /// like `to_time_string` except it does not contain the offset
 pub fn to_naive_time_string(value: Time) -> String {
   let #(_, #(hour, minute, second, milli_second), _) = to_parts(value)
-  pad2(hour) <> ":" <> pad2(minute) <> ":" <> pad2(second) <> "." <> pad3(milli_second)
+  pad2(hour)
+  <> ":"
+  <> pad2(minute)
+  <> ":"
+  <> pad2(second)
+  <> "."
+  <> pad3(milli_second)
 }
 
 pub fn to_iso8601(value: Time) -> String {
   let #(#(year, month, day), #(hour, minute, second, milli_second), offset) =
     to_parts(value)
-  int.to_string(year) <> "-" <> pad2(month) <> "-" <> pad2(day)
+  int.to_string(year)
+  <> "-"
+  <> pad2(month)
+  <> "-"
+  <> pad2(day)
   <> "T"
-  <> pad2(hour) <> ":" <> pad2(minute) <> ":" <> pad2(second)
-  <> "." <> pad3(milli_second)
+  <> pad2(hour)
+  <> ":"
+  <> pad2(minute)
+  <> ":"
+  <> pad2(second)
+  <> "."
+  <> pad3(milli_second)
   <> offset
 }
 
@@ -433,9 +451,12 @@ pub fn parse_naive_time_of_day(
 
 pub fn time_of_day_to_string(value: TimeOfDay) -> String {
   int.to_string(value.hour)
-  <> ":" <> pad2(value.minute)
-  <> ":" <> pad2(value.second)
-  <> "." <> pad3(value.nanosecond / 1_000_000)
+  <> ":"
+  <> pad2(value.minute)
+  <> ":"
+  <> pad2(value.second)
+  <> "."
+  <> pad3(value.nanosecond / 1_000_000)
 }
 
 pub fn time_of_day_to_short_string(value: TimeOfDay) -> String {
@@ -446,10 +467,19 @@ pub fn time_of_day_to_short_string(value: TimeOfDay) -> String {
 pub fn to_naive(value: Time) -> String {
   let #(#(year, month, day), #(hour, minute, second, milli_second), _) =
     to_parts(value)
-  int.to_string(year) <> "-" <> pad2(month) <> "-" <> pad2(day)
+  int.to_string(year)
+  <> "-"
+  <> pad2(month)
+  <> "-"
+  <> pad2(day)
   <> "T"
-  <> pad2(hour) <> ":" <> pad2(minute) <> ":" <> pad2(second)
-  <> "." <> pad3(milli_second)
+  <> pad2(hour)
+  <> ":"
+  <> pad2(minute)
+  <> ":"
+  <> pad2(second)
+  <> "."
+  <> pad3(milli_second)
 }
 
 /// accepts fromats similar to the ones listed for `parse` except that there shoundn't be any offset information
@@ -518,10 +548,18 @@ pub fn to_http(value: Time) -> String {
   let assert Ok(value) = set_offset(value, "Z")
   let #(#(year, _, day), #(hour, minute, second, _), _) = to_parts(value)
   short_string_weekday(value)
-  <> ", " <> pad2(day)
-  <> " " <> short_string_month(value)
-  <> " " <> int.to_string(year)
-  <> " " <> pad2(hour) <> ":" <> pad2(minute) <> ":" <> pad2(second)
+  <> ", "
+  <> pad2(day)
+  <> " "
+  <> short_string_month(value)
+  <> " "
+  <> int.to_string(year)
+  <> " "
+  <> pad2(hour)
+  <> ":"
+  <> pad2(minute)
+  <> ":"
+  <> pad2(second)
   <> " GMT"
 }
 
@@ -535,11 +573,20 @@ pub fn to_http_with_offset(value: Time) -> String {
   }
 
   short_string_weekday(value)
-  <> ", " <> pad2(day)
-  <> " " <> short_string_month(value)
-  <> " " <> int.to_string(year)
-  <> " " <> pad2(hour) <> ":" <> pad2(minute) <> ":" <> pad2(second)
-  <> " " <> offset
+  <> ", "
+  <> pad2(day)
+  <> " "
+  <> short_string_month(value)
+  <> " "
+  <> int.to_string(year)
+  <> " "
+  <> pad2(hour)
+  <> ":"
+  <> pad2(minute)
+  <> ":"
+  <> pad2(second)
+  <> " "
+  <> offset
 }
 
 /// see [here](https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/Date)
@@ -1020,7 +1067,12 @@ pub fn range(from a: Time, to b: option.Option(Time), step s: duration.Duration)
 pub fn set_timezone(value: Time, new_timezone: String) -> Result(Time, Nil) {
   use new_offset_seconds <- result.try(list.key_find(zones.list, new_timezone))
   let Time(timestamp: ts, monotonic_time: mt, ..) = value
-  Time(ts, time_duration.seconds(new_offset_seconds), option.Some(new_timezone), mt)
+  Time(
+    ts,
+    time_duration.seconds(new_offset_seconds),
+    option.Some(new_timezone),
+    mt,
+  )
   |> Ok
 }
 
@@ -1123,12 +1175,7 @@ pub fn from_erlang_local_datetime(
     |> set_day(Day(date.0, date.1, date.2))
     |> set_time_of_day(TimeOfDay(time.0, time.1, time.2, 0))
 
-  Time(
-    base.timestamp,
-    offset,
-    validate_timezone(local_timezone()),
-    option.None,
-  )
+  Time(base.timestamp, offset, validate_timezone(local_timezone()), option.None)
 }
 
 @target(erlang)
@@ -1278,7 +1325,9 @@ fn generate_offset(offset: time_duration.Duration) -> Result(String, Nil) {
     False -> "+"
   }
 
-  Ok(sign <> pad2(abs_seconds / 3600) <> ":" <> pad2({ abs_seconds % 3600 } / 60))
+  Ok(
+    sign <> pad2(abs_seconds / 3600) <> ":" <> pad2({ abs_seconds % 3600 } / 60),
+  )
 }
 
 fn parse_date_section(date: String) -> Result(List(Int), Nil) {

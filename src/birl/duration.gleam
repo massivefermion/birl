@@ -111,7 +111,9 @@ fn new_with_constants(
   values
   |> list.fold(0, fn(total, current) {
     let #(amount, unit) = current
-    total + amount * case unit {
+    total
+    + amount
+    * case unit {
       NanoSecond -> 1
       MicroSecond -> 1000
       MilliSecond -> milli_second
