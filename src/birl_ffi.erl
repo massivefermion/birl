@@ -1,6 +1,6 @@
 -module(birl_ffi).
 
-%% Only export functions that gleam_time doesn't provide
+%% FFI functions for features not available in gleam_time
 -export([
     monotonic_now/0,
     weekday/2,

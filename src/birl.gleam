@@ -32,7 +32,7 @@ pub type TimeOfDay {
   TimeOfDay(hour: Int, minute: Int, second: Int, nanosecond: Int)
 }
 
-/// Deprecated: Use the nanosecond field directly, multiply by 1_000_000 for milliseconds
+/// Deprecated: Use the nanosecond field directly, divide by 1_000_000 for milliseconds
 @deprecated("Use nanosecond field directly, divide by 1_000_000 for milliseconds")
 pub fn get_milli_second(tod: TimeOfDay) -> Int {
   tod.nanosecond / 1_000_000
@@ -1125,7 +1125,7 @@ pub fn get_day(value: Time) -> Day {
 
 pub fn set_time_of_day(value: Time, time: TimeOfDay) -> Time {
   let #(date, _, offset_str) = to_parts(value)
-  // TimeOfDay now uses nanoseconds, convert to milliseconds for from_parts
+  // TimeOfDay stores nanoseconds; convert to milliseconds for from_parts
   let TimeOfDay(hour, minute, second, nanosecond) = time
   let milli_second = nanosecond / 1_000_000
   let assert Ok(new_value) =
@@ -1507,7 +1507,7 @@ const month_strings = [
 ]
 
 // ---------------------------------------------------------------------------
-// FFI functions (retained for features gleam_time doesn't provide)
+// FFI functions for features gleam_time doesn't provide
 // ---------------------------------------------------------------------------
 
 @external(erlang, "birl_ffi", "monotonic_now")
@@ -1535,7 +1535,7 @@ pub fn to_timestamp(value: Time) -> timestamp.Timestamp {
   ts
 }
 
-/// Alias for to_timestamp - provides a consistent naming convention
+/// Alias for to_timestamp, using the to_gleam_* naming pattern
 pub fn to_gleam_timestamp(value: Time) -> timestamp.Timestamp {
   to_timestamp(value)
 }
@@ -1547,7 +1547,7 @@ pub fn from_timestamp(ts: timestamp.Timestamp) -> Time {
   Time(ts, time_duration.seconds(0), option.Some("Etc/UTC"), option.None)
 }
 
-/// Alias for from_timestamp - provides a consistent naming convention
+/// Alias for from_timestamp, using the from_gleam_* naming pattern
 pub fn from_gleam_timestamp(ts: timestamp.Timestamp) -> Time {
   from_timestamp(ts)
 }

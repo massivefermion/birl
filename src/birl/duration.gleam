@@ -7,8 +7,7 @@ import gleam/result
 import gleam/string
 import gleam/time/duration as time_duration
 
-/// Duration is now an alias for gleam_time's Duration type.
-/// It represents a span of time stored in nanoseconds.
+/// An alias for gleam_time's Duration type, representing a span of time in nanoseconds.
 pub type Duration =
   time_duration.Duration
 
@@ -87,7 +86,7 @@ pub fn compare(a: Duration, b: Duration) -> order.Order {
   int.compare(to_nanoseconds(a), to_nanoseconds(b))
 }
 
-/// Convert duration to total nanoseconds (internal helper)
+// Convert duration to total nanoseconds
 fn to_nanoseconds(d: Duration) -> Int {
   let #(seconds, nanoseconds) = time_duration.to_seconds_and_nanoseconds(d)
   seconds * 1_000_000_000 + nanoseconds
@@ -202,7 +201,7 @@ pub fn blur(duration: Duration) -> #(Int, Unit) {
   |> inner_blur
 }
 
-// All constants are now in nanoseconds
+// All constants are in nanoseconds
 const milli_second = 1_000_000
 
 const second = 1_000_000_000
@@ -376,13 +375,13 @@ fn extract(duration: Int, unit_value: Int) -> #(Int, Int) {
 }
 
 // ---------------------------------------------------------------------------
-// gleam_time interoperability (deprecated — Duration is now gleam_time Duration)
+// gleam_time interoperability (deprecated — Duration is gleam_time Duration)
 // ---------------------------------------------------------------------------
 
 /// Convert birl Duration to gleam_time Duration.
 ///
-/// Deprecated: Duration is now the same type as gleam_time Duration.
-/// This function is kept for backward compatibility and is a no-op.
+/// Deprecated: Duration is the same type as gleam_time Duration.
+/// This function exists for backward compatibility and is a no-op.
 @deprecated("Duration is now gleam_time's Duration type. This function is a no-op.")
 pub fn to_gleam_duration(d: Duration) -> time_duration.Duration {
   d
@@ -390,8 +389,8 @@ pub fn to_gleam_duration(d: Duration) -> time_duration.Duration {
 
 /// Convert gleam_time Duration to birl Duration.
 ///
-/// Deprecated: Duration is now the same type as gleam_time Duration.
-/// This function is kept for backward compatibility and is a no-op.
+/// Deprecated: Duration is the same type as gleam_time Duration.
+/// This function exists for backward compatibility and is a no-op.
 @deprecated("Duration is now gleam_time's Duration type. This function is a no-op.")
 pub fn from_gleam_duration(d: time_duration.Duration) -> Duration {
   d

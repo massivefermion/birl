@@ -1,6 +1,6 @@
 import { Some } from '../gleam_stdlib/gleam/option.mjs';
 
-// Only export functions that gleam_time doesn't provide
+// FFI functions for features not available in gleam_time
 
 export function local_timezone() {
   return new Some(Intl.DateTimeFormat().resolvedOptions().timeZone);
