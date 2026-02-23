@@ -298,21 +298,10 @@ pub fn timestamp_epoch_test() {
   |> should.equal(0)
 }
 
-pub fn duration_roundtrip_test() {
-  let d = duration.hours(2) |> duration.add(duration.minutes(30))
-  let gleam_d = duration.to_gleam_duration(d)
-  let back = duration.from_gleam_duration(gleam_d)
-  d
-  |> should.equal(back)
-}
-
-pub fn duration_conversion_test() {
-  // 1 second = 1_000_000 microseconds in birl
-  // 1 second = 1_000_000_000 nanoseconds in gleam_time
+pub fn duration_is_gleam_time_duration_test() {
+  // Duration is gleam_time's Duration type, so it works directly
   let d = duration.seconds(1)
-  let gleam_d = duration.to_gleam_duration(d)
-  let #(seconds, nanoseconds) =
-    time_duration.to_seconds_and_nanoseconds(gleam_d)
+  let #(seconds, nanoseconds) = time_duration.to_seconds_and_nanoseconds(d)
   seconds
   |> should.equal(1)
   nanoseconds
@@ -344,20 +333,6 @@ pub fn time_of_day_roundtrip_test() {
   let back = birl.calendar_to_time_of_day(calendar_tod)
   tod
   |> should.equal(back)
-}
-
-pub fn get_milli_second_test() {
-  let tod = birl.TimeOfDay(14, 30, 45, 123_000_000)
-  birl.get_milli_second(tod)
-  |> should.equal(123)
-
-  let tod_zero = birl.TimeOfDay(0, 0, 0, 0)
-  birl.get_milli_second(tod_zero)
-  |> should.equal(0)
-
-  let tod_sub_ms = birl.TimeOfDay(0, 0, 0, 500_000)
-  birl.get_milli_second(tod_sub_ms)
-  |> should.equal(0)
 }
 
 pub fn to_unix_nano_test() {
