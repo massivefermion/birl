@@ -22,34 +22,26 @@ pub fn from_start_and_duration(start: birl.Time, duration: duration.Duration) {
 }
 
 pub fn shift(interval: Interval, duration: duration.Duration) {
-  case interval {
-    Interval(start, end) ->
-      Interval(birl.add(start, duration), birl.add(end, duration))
-  }
+  let Interval(start, end) = interval
+  Interval(birl.add(start, duration), birl.add(end, duration))
 }
 
 pub fn scale_up(interval: Interval, factor: Int) {
-  case interval {
-    Interval(start, end) -> {
-      let assert Ok(interval) =
-        birl.difference(end, start)
-        |> duration.scale_up(factor)
-        |> from_start_and_duration(start, _)
-      interval
-    }
-  }
+  let Interval(start, end) = interval
+  let assert Ok(scaled) =
+    birl.difference(end, start)
+    |> duration.scale_up(factor)
+    |> from_start_and_duration(start, _)
+  scaled
 }
 
 pub fn scale_down(interval: Interval, factor: Int) {
-  case interval {
-    Interval(start, end) -> {
-      let assert Ok(interval) =
-        birl.difference(end, start)
-        |> duration.scale_down(factor)
-        |> from_start_and_duration(start, _)
-      interval
-    }
-  }
+  let Interval(start, end) = interval
+  let assert Ok(scaled) =
+    birl.difference(end, start)
+    |> duration.scale_down(factor)
+    |> from_start_and_duration(start, _)
+  scaled
 }
 
 pub fn intersection(a: Interval, b: Interval) -> option.Option(Interval) {
@@ -70,21 +62,17 @@ pub fn intersection(a: Interval, b: Interval) -> option.Option(Interval) {
 }
 
 pub fn includes(interval: Interval, time: birl.Time) {
-  case interval {
-    Interval(start, end) ->
-      list.contains([order.Eq, order.Lt], birl.compare(start, time))
-      && list.contains([order.Eq, order.Gt], birl.compare(end, time))
-  }
+  let Interval(start, end) = interval
+  list.contains([order.Eq, order.Lt], birl.compare(start, time))
+  && list.contains([order.Eq, order.Gt], birl.compare(end, time))
 }
 
 pub fn contains(a: Interval, b: Interval) {
-  case b {
-    Interval(start, end) -> includes(a, start) && includes(a, end)
-  }
+  let Interval(start, end) = b
+  includes(a, start) && includes(a, end)
 }
 
 pub fn get_bounds(interval: Interval) -> #(birl.Time, birl.Time) {
-  case interval {
-    Interval(start, end) -> #(start, end)
-  }
+  let Interval(start, end) = interval
+  #(start, end)
 }

@@ -78,18 +78,11 @@ pub fn now() -> Time {
   let ts = timestamp.system_time()
   let offset = calendar.local_offset()
   let monotonic_now = ffi_monotonic_now()
-  let timezone = local_timezone()
 
   Time(
     ts,
     offset,
-    option.map(timezone, fn(tz) {
-      case list.any(zones.list, fn(item) { item.0 == tz }) {
-        True -> option.Some(tz)
-        False -> option.None
-      }
-    })
-      |> option.flatten,
+    validate_timezone(local_timezone()),
     option.Some(monotonic_now),
   )
 }
@@ -125,21 +118,16 @@ pub fn now_with_offset(offset: String) -> Result(Time, Nil) {
 }
 
 pub fn now_with_timezone(timezone: String) -> Result(Time, Nil) {
-  case list.key_find(zones.list, timezone) {
-    Ok(offset_seconds) -> {
-      let ts = timestamp.system_time()
-      let monotonic_now = ffi_monotonic_now()
-      Time(
-        ts,
-        time_duration.seconds(offset_seconds),
-        option.Some(timezone),
-        option.Some(monotonic_now),
-      )
-      |> Ok
-    }
-
-    Error(Nil) -> Error(Nil)
-  }
+  use offset_seconds <- result.try(list.key_find(zones.list, timezone))
+  let ts = timestamp.system_time()
+  let monotonic_now = ffi_monotonic_now()
+  Time(
+    ts,
+    time_duration.seconds(offset_seconds),
+    option.Some(timezone),
+    option.Some(monotonic_now),
+  )
+  |> Ok
 }
 
 pub fn monotonic_now() -> Int {
@@ -154,142 +142,38 @@ pub fn has_occured(value: Time) -> Bool {
 /// returns a string which is the date part of an ISO8601 string along with the offset
 pub fn to_date_string(value: Time) -> String {
   let #(#(year, month, day), _, offset) = to_parts(value)
-
-  int.to_string(year)
-  <> "-"
-  <> {
-    month
-    |> int.to_string
-    |> string.pad_start(2, "0")
-  }
-  <> "-"
-  <> {
-    day
-    |> int.to_string
-    |> string.pad_start(2, "0")
-  }
-  <> offset
+  int.to_string(year) <> "-" <> pad2(month) <> "-" <> pad2(day) <> offset
 }
 
 /// like `to_date_string` except it does not contain the offset
 pub fn to_naive_date_string(value: Time) -> String {
   let #(#(year, month, day), _, _) = to_parts(value)
-
-  int.to_string(year)
-  <> "-"
-  <> {
-    month
-    |> int.to_string
-    |> string.pad_start(2, "0")
-  }
-  <> "-"
-  <> {
-    day
-    |> int.to_string
-    |> string.pad_start(2, "0")
-  }
+  int.to_string(year) <> "-" <> pad2(month) <> "-" <> pad2(day)
 }
 
 /// returns a string which is the time part of an ISO8601 string along with the offset
 pub fn to_time_string(value: Time) -> String {
   let #(_, #(hour, minute, second, milli_second), offset) = to_parts(value)
-
-  {
-    hour
-    |> int.to_string
-    |> string.pad_start(2, "0")
-  }
-  <> ":"
-  <> {
-    minute
-    |> int.to_string
-    |> string.pad_start(2, "0")
-  }
-  <> ":"
-  <> {
-    second
-    |> int.to_string
-    |> string.pad_start(2, "0")
-  }
-  <> "."
-  <> {
-    milli_second
-    |> int.to_string
-    |> string.pad_start(3, "0")
-  }
+  pad2(hour)
+  <> ":" <> pad2(minute)
+  <> ":" <> pad2(second)
+  <> "." <> pad3(milli_second)
   <> offset
 }
 
 /// like `to_time_string` except it does not contain the offset
 pub fn to_naive_time_string(value: Time) -> String {
   let #(_, #(hour, minute, second, milli_second), _) = to_parts(value)
-
-  {
-    hour
-    |> int.to_string
-    |> string.pad_start(2, "0")
-  }
-  <> ":"
-  <> {
-    minute
-    |> int.to_string
-    |> string.pad_start(2, "0")
-  }
-  <> ":"
-  <> {
-    second
-    |> int.to_string
-    |> string.pad_start(2, "0")
-  }
-  <> "."
-  <> {
-    milli_second
-    |> int.to_string
-    |> string.pad_start(3, "0")
-  }
+  pad2(hour) <> ":" <> pad2(minute) <> ":" <> pad2(second) <> "." <> pad3(milli_second)
 }
 
 pub fn to_iso8601(value: Time) -> String {
   let #(#(year, month, day), #(hour, minute, second, milli_second), offset) =
     to_parts(value)
-
-  int.to_string(year)
-  <> "-"
-  <> {
-    month
-    |> int.to_string
-    |> string.pad_start(2, "0")
-  }
-  <> "-"
-  <> {
-    day
-    |> int.to_string
-    |> string.pad_start(2, "0")
-  }
+  int.to_string(year) <> "-" <> pad2(month) <> "-" <> pad2(day)
   <> "T"
-  <> {
-    hour
-    |> int.to_string
-    |> string.pad_start(2, "0")
-  }
-  <> ":"
-  <> {
-    minute
-    |> int.to_string
-    |> string.pad_start(2, "0")
-  }
-  <> ":"
-  <> {
-    second
-    |> int.to_string
-    |> string.pad_start(2, "0")
-  }
-  <> "."
-  <> {
-    milli_second
-    |> int.to_string
-    |> string.pad_start(3, "0")
-  }
+  <> pad2(hour) <> ":" <> pad2(minute) <> ":" <> pad2(second)
+  <> "." <> pad3(milli_second)
   <> offset
 }
 
@@ -549,66 +433,23 @@ pub fn parse_naive_time_of_day(
 
 pub fn time_of_day_to_string(value: TimeOfDay) -> String {
   int.to_string(value.hour)
-  <> ":"
-  <> int.to_string(value.minute)
-  |> string.pad_start(2, "0")
-  <> ":"
-  <> int.to_string(value.second)
-  |> string.pad_start(2, "0")
-  <> "."
-  <> int.to_string(value.nanosecond / 1_000_000)
-  |> string.pad_start(3, "0")
+  <> ":" <> pad2(value.minute)
+  <> ":" <> pad2(value.second)
+  <> "." <> pad3(value.nanosecond / 1_000_000)
 }
 
 pub fn time_of_day_to_short_string(value: TimeOfDay) -> String {
-  int.to_string(value.hour)
-  <> ":"
-  <> int.to_string(value.minute)
-  |> string.pad_start(2, "0")
+  int.to_string(value.hour) <> ":" <> pad2(value.minute)
 }
 
 /// the naive format is the same as ISO8601 except that it does not contain the offset
 pub fn to_naive(value: Time) -> String {
   let #(#(year, month, day), #(hour, minute, second, milli_second), _) =
     to_parts(value)
-
-  int.to_string(year)
-  <> "-"
-  <> {
-    month
-    |> int.to_string
-    |> string.pad_start(2, "0")
-  }
-  <> "-"
-  <> {
-    day
-    |> int.to_string
-    |> string.pad_start(2, "0")
-  }
+  int.to_string(year) <> "-" <> pad2(month) <> "-" <> pad2(day)
   <> "T"
-  <> {
-    hour
-    |> int.to_string
-    |> string.pad_start(2, "0")
-  }
-  <> ":"
-  <> {
-    minute
-    |> int.to_string
-    |> string.pad_start(2, "0")
-  }
-  <> ":"
-  <> {
-    second
-    |> int.to_string
-    |> string.pad_start(2, "0")
-  }
-  <> "."
-  <> {
-    milli_second
-    |> int.to_string
-    |> string.pad_start(3, "0")
-  }
+  <> pad2(hour) <> ":" <> pad2(minute) <> ":" <> pad2(second)
+  <> "." <> pad3(milli_second)
 }
 
 /// accepts fromats similar to the ones listed for `parse` except that there shoundn't be any offset information
@@ -676,83 +517,29 @@ pub fn from_naive(value: String) -> Result(Time, Nil) {
 pub fn to_http(value: Time) -> String {
   let assert Ok(value) = set_offset(value, "Z")
   let #(#(year, _, day), #(hour, minute, second, _), _) = to_parts(value)
-  let short_weekday = short_string_weekday(value)
-  let short_month = short_string_month(value)
-
-  short_weekday
-  <> ", "
-  <> {
-    day
-    |> int.to_string
-    |> string.pad_start(2, "0")
-  }
-  <> " "
-  <> short_month
-  <> " "
-  <> int.to_string(year)
-  <> " "
-  <> {
-    hour
-    |> int.to_string
-    |> string.pad_start(2, "0")
-  }
-  <> ":"
-  <> {
-    minute
-    |> int.to_string
-    |> string.pad_start(2, "0")
-  }
-  <> ":"
-  <> {
-    second
-    |> int.to_string
-    |> string.pad_start(2, "0")
-  }
+  short_string_weekday(value)
+  <> ", " <> pad2(day)
+  <> " " <> short_string_month(value)
+  <> " " <> int.to_string(year)
+  <> " " <> pad2(hour) <> ":" <> pad2(minute) <> ":" <> pad2(second)
   <> " GMT"
 }
 
 /// like `to_http` but assumes the offset in the DateTime value instead of `GMT`
 pub fn to_http_with_offset(value: Time) -> String {
   let #(#(year, _, day), #(hour, minute, second, _), offset) = to_parts(value)
-  let short_weekday = short_string_weekday(value)
-  let short_month = short_string_month(value)
 
   let offset = case offset {
     "Z" -> "GMT"
     _ -> offset
   }
 
-  short_weekday
-  <> ", "
-  <> {
-    day
-    |> int.to_string
-    |> string.pad_start(2, "0")
-  }
-  <> " "
-  <> short_month
-  <> " "
-  <> int.to_string(year)
-  <> " "
-  <> {
-    hour
-    |> int.to_string
-    |> string.pad_start(2, "0")
-  }
-  <> ":"
-  <> {
-    minute
-    |> int.to_string
-    |> string.pad_start(2, "0")
-  }
-  <> ":"
-  <> {
-    second
-    |> int.to_string
-    |> string.pad_start(2, "0")
-  }
-  <> " "
-  <> offset
+  short_string_weekday(value)
+  <> ", " <> pad2(day)
+  <> " " <> short_string_month(value)
+  <> " " <> int.to_string(year)
+  <> " " <> pad2(hour) <> ":" <> pad2(minute) <> ":" <> pad2(second)
+  <> " " <> offset
 }
 
 /// see [here](https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/Date)
@@ -1062,13 +849,7 @@ pub fn legible_difference(a: Time, b: Time) -> String {
 
       case is_negative {
         True -> "in " <> int.to_string(amount) <> " " <> unit
-        False ->
-          amount
-          |> int.absolute_value
-          |> int.to_string
-          <> " "
-          <> unit
-          <> " ago"
+        False -> int.to_string(amount) <> " " <> unit <> " ago"
       }
     }
   }
@@ -1237,20 +1018,10 @@ pub fn range(from a: Time, to b: option.Option(Time), step s: duration.Duration)
 
 /// WARNING: Does not respect daylight saving time!
 pub fn set_timezone(value: Time, new_timezone: String) -> Result(Time, Nil) {
-  case list.key_find(zones.list, new_timezone) {
-    Ok(new_offset_seconds) -> {
-      let Time(timestamp: ts, monotonic_time: mt, ..) = value
-      Time(
-        ts,
-        time_duration.seconds(new_offset_seconds),
-        option.Some(new_timezone),
-        mt,
-      )
-      |> Ok
-    }
-
-    Error(Nil) -> Error(Nil)
-  }
+  use new_offset_seconds <- result.try(list.key_find(zones.list, new_timezone))
+  let Time(timestamp: ts, monotonic_time: mt, ..) = value
+  Time(ts, time_duration.seconds(new_offset_seconds), option.Some(new_timezone), mt)
+  |> Ok
 }
 
 pub fn get_timezone(value: Time) -> option.Option(String) {
@@ -1352,18 +1123,10 @@ pub fn from_erlang_local_datetime(
     |> set_day(Day(date.0, date.1, date.2))
     |> set_time_of_day(TimeOfDay(time.0, time.1, time.2, 0))
 
-  let timezone = local_timezone()
-
   Time(
     base.timestamp,
     offset,
-    option.map(timezone, fn(tz) {
-      case list.any(zones.list, fn(item) { item.0 == tz }) {
-        True -> option.Some(tz)
-        False -> option.None
-      }
-    })
-      |> option.flatten,
+    validate_timezone(local_timezone()),
     option.None,
   )
 }
@@ -1476,6 +1239,30 @@ fn parse_offset(offset: String) -> Result(Int, Nil) {
   }
 }
 
+fn pad2(value: Int) -> String {
+  value
+  |> int.to_string
+  |> string.pad_start(2, "0")
+}
+
+fn pad3(value: Int) -> String {
+  value
+  |> int.to_string
+  |> string.pad_start(3, "0")
+}
+
+/// Validates that a timezone string from the system is a known timezone
+fn validate_timezone(timezone: option.Option(String)) -> option.Option(String) {
+  timezone
+  |> option.map(fn(tz) {
+    case list.any(zones.list, fn(item) { item.0 == tz }) {
+      True -> option.Some(tz)
+      False -> option.None
+    }
+  })
+  |> option.flatten
+}
+
 fn duration_to_microseconds(dur: time_duration.Duration) -> Int {
   let #(seconds, nanoseconds) = time_duration.to_seconds_and_nanoseconds(dur)
   seconds * 1_000_000 + nanoseconds / 1000
@@ -1485,27 +1272,13 @@ fn generate_offset(offset: time_duration.Duration) -> Result(String, Nil) {
   let #(total_seconds, _) = time_duration.to_seconds_and_nanoseconds(offset)
   use <- bool.guard(total_seconds == 0, Ok("Z"))
 
-  let is_negative = total_seconds < 0
   let abs_seconds = int.absolute_value(total_seconds)
-  let hours = abs_seconds / 3600
-  let minutes = { abs_seconds % 3600 } / 60
-
-  let sign = case is_negative {
+  let sign = case total_seconds < 0 {
     True -> "-"
     False -> "+"
   }
 
-  let hour_str =
-    hours
-    |> int.to_string
-    |> string.pad_start(2, "0")
-
-  let minute_str =
-    minutes
-    |> int.to_string
-    |> string.pad_start(2, "0")
-
-  Ok(sign <> hour_str <> ":" <> minute_str)
+  Ok(sign <> pad2(abs_seconds / 3600) <> ":" <> pad2({ abs_seconds % 3600 } / 60))
 }
 
 fn parse_date_section(date: String) -> Result(List(Int), Nil) {
@@ -1568,11 +1341,8 @@ fn is_invalid_date(date: String) -> Bool {
   |> string.to_utf_codepoints
   |> list.map(string.utf_codepoint_to_int)
   |> list.any(fn(code) {
-    case code {
-      _ if code == 45 -> False
-      _ if code >= 48 && code <= 57 -> False
-      _ -> True
-    }
+    // Only allow digits (48-57) and hyphen (45)
+    code != 45 && { code < 48 || code > 57 }
   })
 }
 
@@ -1581,10 +1351,8 @@ fn is_invalid_time(time: String) -> Bool {
   |> string.to_utf_codepoints
   |> list.map(string.utf_codepoint_to_int)
   |> list.any(fn(code) {
-    case code {
-      _ if code >= 48 && code <= 58 -> False
-      _ -> True
-    }
+    // Only allow digits (48-57) and colon (58)
+    code < 48 || code > 58
   })
 }
 
