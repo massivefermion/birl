@@ -1,16 +1,12 @@
 -module(birl_ffi).
 
+%% FFI functions for features not available in gleam_time
 -export([
-    now/0,
-    local_offset/0,
     monotonic_now/0,
-    to_parts/2,
-    from_parts/2,
     weekday/2,
     local_timezone/0
 ]).
 
--define(DaysInMonths, [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31]).
 -define(Regions, [
     "Africa",
     "America",
@@ -30,20 +26,19 @@
     "US"
 ]).
 
-now() -> os:system_time(microsecond).
+monotonic_now() ->
+    StartTime = erlang:system_info(start_time),
+    CurrentTime = erlang:monotonic_time(),
+    Difference = (CurrentTime - StartTime),
+    erlang:convert_time_unit(Difference, native, microsecond).
 
-local_offset() ->
-    Timestamp = erlang:timestamp(),
-    {{_, LMo, LD}, {LH, LM, _}} = calendar:now_to_local_time(Timestamp),
-    {{_, UMo, UD}, {UH, UM, _}} = calendar:now_to_universal_time(Timestamp),
-    if
-        LD == UD ->
-            (LH - UH) * 60 + LM - UM;
-        (LD > UD andalso LMo == UMo) or (LD == 1 andalso LMo > UMo) ->
-            (23 - UH) * 60 + (60 - UM) + LH * 60 + LM;
-        true ->
-            -((23 - LH) * 60 + (60 - LM) + UH * 60 + UM)
-    end.
+weekday(Timestamp, Offset) ->
+    {Date, _} = to_parts(Timestamp, Offset),
+    calendar:day_of_the_week(Date) - 1.
+
+%% Helper for weekday calculation
+to_parts(Timestamp, Offset) ->
+    calendar:system_time_to_universal_time(Timestamp + Offset, microsecond).
 
 local_timezone() ->
     case os:type() of
@@ -75,41 +70,6 @@ local_timezone() ->
             end
     end.
 
-monotonic_now() ->
-    StartTime = erlang:system_info(start_time),
-    CurrentTime = erlang:monotonic_time(),
-    Difference = (CurrentTime - StartTime),
-    erlang:convert_time_unit(Difference, native, microsecond).
-
-to_parts(Timestamp, Offset) ->
-    {Date, {Hour, Minute, Second}} = calendar:system_time_to_universal_time(
-        Timestamp + Offset, microsecond
-    ),
-    MilliSecond = (Timestamp rem 1_000_000) div 1_000,
-    {Date,
-        {Hour, Minute, Second,
-            if
-                MilliSecond == 0 -> MilliSecond;
-                Timestamp >= 0 -> MilliSecond;
-                true -> 1000 + MilliSecond
-            end}}.
-
-from_parts(Parts, Offset) ->
-    {{Year, Month, Day}, {Hour, Minute, Second, MilliSecond}} = Parts,
-    DaysInYears = calculate_days_from_year(Year - 1, 0),
-    DaysInMonths = calculate_days_from_month(Year, Month - 1, 0),
-    Days =
-        if
-            DaysInYears >= 0 -> DaysInYears + DaysInMonths + Day - 1;
-            true -> DaysInYears + DaysInMonths + Day
-        end,
-    Seconds = (Days * 3600 * 24) + (Hour * 3600) + (Minute * 60) + Second,
-    Seconds * 1_000_000 + MilliSecond * 1_000 - Offset.
-
-weekday(Timestamp, Offset) ->
-    {Date, _} = to_parts(Timestamp, Offset),
-    calendar:day_of_the_week(Date) - 1.
-
 local_timezone_from_etc() ->
     case file:read_file("/etc/timezone") of
         {ok, NewLinedTimezone} ->
@@ -129,33 +89,6 @@ timezone_from_path(Path) ->
         fun(Segment) -> not lists:member(Segment, ?Regions) end, Split
     ),
     binary:list_to_bin(string:join(ZoneParts, "/")).
-
-calculate_days_from_year(1969, Days) ->
-    Days;
-calculate_days_from_year(Year, Days) when Year > 1969 ->
-    case calendar:is_leap_year(Year) of
-        true ->
-            calculate_days_from_year(Year - 1, Days + 366);
-        false ->
-            calculate_days_from_year(Year - 1, Days + 365)
-    end;
-calculate_days_from_year(Year, Days) when Year < 1969 ->
-    case calendar:is_leap_year(Year) of
-        true ->
-            calculate_days_from_year(Year + 1, Days - 366);
-        false ->
-            calculate_days_from_year(Year + 1, Days - 365)
-    end.
-
-calculate_days_from_month(_, 0, Days) ->
-    Days;
-calculate_days_from_month(Year, Month, Days) ->
-    case calendar:is_leap_year(Year) and (Month == 2) of
-        true ->
-            calculate_days_from_month(Year, 1, Days + 29);
-        false ->
-            calculate_days_from_month(Year, Month - 1, Days + lists:nth(Month, ?DaysInMonths))
-    end.
 
 win_to_iana("Afghanistan Standard Time") -> {some, <<"Asia/Kabul">>};
 win_to_iana("Alaskan Standard Time") -> {some, <<"America/Anchorage">>};

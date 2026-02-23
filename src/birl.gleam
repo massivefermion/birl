@@ -10,14 +10,15 @@ import gleam/regexp
 import gleam/result
 import gleam/string
 import gleam/time/calendar
+import gleam/time/duration as time_duration
 import gleam/time/timestamp
 
 import ranger
 
 pub opaque type Time {
   Time(
-    wall_time: Int,
-    offset: Int,
+    timestamp: timestamp.Timestamp,
+    offset: time_duration.Duration,
     timezone: option.Option(String),
     monotonic_time: option.Option(Int),
   )
@@ -28,11 +29,24 @@ pub type Day {
 }
 
 pub type TimeOfDay {
-  TimeOfDay(hour: Int, minute: Int, second: Int, milli_second: Int)
+  TimeOfDay(hour: Int, minute: Int, second: Int, nanosecond: Int)
+}
+
+/// Deprecated: Use the nanosecond field directly, divide by 1_000_000 for milliseconds
+@deprecated("Use nanosecond field directly, divide by 1_000_000 for milliseconds")
+pub fn get_milli_second(tod: TimeOfDay) -> Int {
+  tod.nanosecond / 1_000_000
 }
 
 /// starting point of unix timestamps
-pub const unix_epoch = Time(0, 0, option.None, option.None)
+pub fn unix_epoch() -> Time {
+  Time(
+    timestamp.from_unix_seconds(0),
+    time_duration.seconds(0),
+    option.None,
+    option.None,
+  )
+}
 
 pub type Weekday {
   Mon
@@ -61,30 +75,28 @@ pub type Month {
 
 /// use this to get the current time in the local timezone offset
 pub fn now() -> Time {
-  let now = ffi_now()
-  let offset_in_minutes = ffi_local_offset()
+  let ts = timestamp.system_time()
+  let offset = calendar.local_offset()
   let monotonic_now = ffi_monotonic_now()
-  let timezone = local_timezone()
 
   Time(
-    now,
-    offset_in_minutes * 60_000_000,
-    option.map(timezone, fn(tz) {
-      case list.any(zones.list, fn(item) { item.0 == tz }) {
-        True -> option.Some(tz)
-        False -> option.None
-      }
-    })
-      |> option.flatten,
+    ts,
+    offset,
+    validate_timezone(local_timezone()),
     option.Some(monotonic_now),
   )
 }
 
 /// use this to get the current time in utc
 pub fn utc_now() -> Time {
-  let now = ffi_now()
+  let ts = timestamp.system_time()
   let monotonic_now = ffi_monotonic_now()
-  Time(now, 0, option.Some("Etc/UTC"), option.Some(monotonic_now))
+  Time(
+    ts,
+    time_duration.seconds(0),
+    option.Some("Etc/UTC"),
+    option.Some(monotonic_now),
+  )
 }
 
 /// use this to get the current time with a given offset.
@@ -93,29 +105,29 @@ pub fn utc_now() -> Time {
 ///
 /// `"+330", "03:30", "-8:00","-7", "-0400", "03"`
 pub fn now_with_offset(offset: String) -> Result(Time, Nil) {
-  use offset <- result.try(parse_offset(offset))
-  let now = ffi_now()
+  use offset_seconds <- result.try(parse_offset(offset))
+  let ts = timestamp.system_time()
   let monotonic_now = ffi_monotonic_now()
-  Time(now, offset, option.None, option.Some(monotonic_now))
+  Time(
+    ts,
+    time_duration.seconds(offset_seconds),
+    option.None,
+    option.Some(monotonic_now),
+  )
   |> Ok
 }
 
 pub fn now_with_timezone(timezone: String) -> Result(Time, Nil) {
-  case list.key_find(zones.list, timezone) {
-    Ok(offset) -> {
-      let now = ffi_now()
-      let monotonic_now = ffi_monotonic_now()
-      Time(
-        now,
-        offset * 1_000_000,
-        option.Some(timezone),
-        option.Some(monotonic_now),
-      )
-      |> Ok
-    }
-
-    Error(Nil) -> Error(Nil)
-  }
+  use offset_seconds <- result.try(list.key_find(zones.list, timezone))
+  let ts = timestamp.system_time()
+  let monotonic_now = ffi_monotonic_now()
+  Time(
+    ts,
+    time_duration.seconds(offset_seconds),
+    option.Some(timezone),
+    option.Some(monotonic_now),
+  )
+  |> Ok
 }
 
 pub fn monotonic_now() -> Int {
@@ -130,142 +142,56 @@ pub fn has_occured(value: Time) -> Bool {
 /// returns a string which is the date part of an ISO8601 string along with the offset
 pub fn to_date_string(value: Time) -> String {
   let #(#(year, month, day), _, offset) = to_parts(value)
-
-  int.to_string(year)
-  <> "-"
-  <> {
-    month
-    |> int.to_string
-    |> string.pad_start(2, "0")
-  }
-  <> "-"
-  <> {
-    day
-    |> int.to_string
-    |> string.pad_start(2, "0")
-  }
-  <> offset
+  int.to_string(year) <> "-" <> pad2(month) <> "-" <> pad2(day) <> offset
 }
 
 /// like `to_date_string` except it does not contain the offset
 pub fn to_naive_date_string(value: Time) -> String {
   let #(#(year, month, day), _, _) = to_parts(value)
-
-  int.to_string(year)
-  <> "-"
-  <> {
-    month
-    |> int.to_string
-    |> string.pad_start(2, "0")
-  }
-  <> "-"
-  <> {
-    day
-    |> int.to_string
-    |> string.pad_start(2, "0")
-  }
+  int.to_string(year) <> "-" <> pad2(month) <> "-" <> pad2(day)
 }
 
 /// returns a string which is the time part of an ISO8601 string along with the offset
 pub fn to_time_string(value: Time) -> String {
   let #(_, #(hour, minute, second, milli_second), offset) = to_parts(value)
-
-  {
-    hour
-    |> int.to_string
-    |> string.pad_start(2, "0")
-  }
+  pad2(hour)
   <> ":"
-  <> {
-    minute
-    |> int.to_string
-    |> string.pad_start(2, "0")
-  }
+  <> pad2(minute)
   <> ":"
-  <> {
-    second
-    |> int.to_string
-    |> string.pad_start(2, "0")
-  }
+  <> pad2(second)
   <> "."
-  <> {
-    milli_second
-    |> int.to_string
-    |> string.pad_start(3, "0")
-  }
+  <> pad3(milli_second)
   <> offset
 }
 
 /// like `to_time_string` except it does not contain the offset
 pub fn to_naive_time_string(value: Time) -> String {
   let #(_, #(hour, minute, second, milli_second), _) = to_parts(value)
-
-  {
-    hour
-    |> int.to_string
-    |> string.pad_start(2, "0")
-  }
+  pad2(hour)
   <> ":"
-  <> {
-    minute
-    |> int.to_string
-    |> string.pad_start(2, "0")
-  }
+  <> pad2(minute)
   <> ":"
-  <> {
-    second
-    |> int.to_string
-    |> string.pad_start(2, "0")
-  }
+  <> pad2(second)
   <> "."
-  <> {
-    milli_second
-    |> int.to_string
-    |> string.pad_start(3, "0")
-  }
+  <> pad3(milli_second)
 }
 
 pub fn to_iso8601(value: Time) -> String {
   let #(#(year, month, day), #(hour, minute, second, milli_second), offset) =
     to_parts(value)
-
   int.to_string(year)
   <> "-"
-  <> {
-    month
-    |> int.to_string
-    |> string.pad_start(2, "0")
-  }
+  <> pad2(month)
   <> "-"
-  <> {
-    day
-    |> int.to_string
-    |> string.pad_start(2, "0")
-  }
+  <> pad2(day)
   <> "T"
-  <> {
-    hour
-    |> int.to_string
-    |> string.pad_start(2, "0")
-  }
+  <> pad2(hour)
   <> ":"
-  <> {
-    minute
-    |> int.to_string
-    |> string.pad_start(2, "0")
-  }
+  <> pad2(minute)
   <> ":"
-  <> {
-    second
-    |> int.to_string
-    |> string.pad_start(2, "0")
-  }
+  <> pad2(second)
   <> "."
-  <> {
-    milli_second
-    |> int.to_string
-    |> string.pad_start(3, "0")
-  }
+  <> pad3(milli_second)
   <> offset
 }
 
@@ -462,10 +388,16 @@ pub fn parse_time_of_day(value: String) -> Result(#(TimeOfDay, String), Nil) {
       use time_of_day <- result.try(parse_time_section(time_string))
       let assert [hour, minute, second] = time_of_day
 
-      use offset <- result.try(parse_offset(offset_string))
-      use offset_string <- result.try(generate_offset(offset))
+      use offset_seconds <- result.try(parse_offset(offset_string))
+      use offset_string <- result.try(
+        generate_offset(time_duration.seconds(offset_seconds)),
+      )
 
-      Ok(#(TimeOfDay(hour, minute, second, milli_seconds), offset_string))
+      // Convert milliseconds to nanoseconds for TimeOfDay
+      Ok(#(
+        TimeOfDay(hour, minute, second, milli_seconds * 1_000_000),
+        offset_string,
+      ))
     }
     Error(Nil) -> Error(Nil)
   }
@@ -510,7 +442,8 @@ pub fn parse_naive_time_of_day(
       use time_of_day <- result.try(parse_time_section(time_string))
       let assert [hour, minute, second] = time_of_day
 
-      Ok(#(TimeOfDay(hour, minute, second, milli_seconds), "Z"))
+      // Convert milliseconds to nanoseconds for TimeOfDay
+      Ok(#(TimeOfDay(hour, minute, second, milli_seconds * 1_000_000), "Z"))
     }
     Error(Nil) -> Error(Nil)
   }
@@ -519,65 +452,34 @@ pub fn parse_naive_time_of_day(
 pub fn time_of_day_to_string(value: TimeOfDay) -> String {
   int.to_string(value.hour)
   <> ":"
-  <> int.to_string(value.minute)
-  |> string.pad_start(2, "0")
+  <> pad2(value.minute)
   <> ":"
-  <> int.to_string(value.second)
-  |> string.pad_start(2, "0")
+  <> pad2(value.second)
   <> "."
-  <> int.to_string(value.milli_second)
-  |> string.pad_start(3, "0")
+  <> pad3(value.nanosecond / 1_000_000)
 }
 
 pub fn time_of_day_to_short_string(value: TimeOfDay) -> String {
-  int.to_string(value.hour)
-  <> ":"
-  <> int.to_string(value.minute)
-  |> string.pad_start(2, "0")
+  int.to_string(value.hour) <> ":" <> pad2(value.minute)
 }
 
 /// the naive format is the same as ISO8601 except that it does not contain the offset
 pub fn to_naive(value: Time) -> String {
   let #(#(year, month, day), #(hour, minute, second, milli_second), _) =
     to_parts(value)
-
   int.to_string(year)
   <> "-"
-  <> {
-    month
-    |> int.to_string
-    |> string.pad_start(2, "0")
-  }
+  <> pad2(month)
   <> "-"
-  <> {
-    day
-    |> int.to_string
-    |> string.pad_start(2, "0")
-  }
+  <> pad2(day)
   <> "T"
-  <> {
-    hour
-    |> int.to_string
-    |> string.pad_start(2, "0")
-  }
+  <> pad2(hour)
   <> ":"
-  <> {
-    minute
-    |> int.to_string
-    |> string.pad_start(2, "0")
-  }
+  <> pad2(minute)
   <> ":"
-  <> {
-    second
-    |> int.to_string
-    |> string.pad_start(2, "0")
-  }
+  <> pad2(second)
   <> "."
-  <> {
-    milli_second
-    |> int.to_string
-    |> string.pad_start(3, "0")
-  }
+  <> pad3(milli_second)
 }
 
 /// accepts fromats similar to the ones listed for `parse` except that there shoundn't be any offset information
@@ -645,81 +547,44 @@ pub fn from_naive(value: String) -> Result(Time, Nil) {
 pub fn to_http(value: Time) -> String {
   let assert Ok(value) = set_offset(value, "Z")
   let #(#(year, _, day), #(hour, minute, second, _), _) = to_parts(value)
-  let short_weekday = short_string_weekday(value)
-  let short_month = short_string_month(value)
-
-  short_weekday
+  short_string_weekday(value)
   <> ", "
-  <> {
-    day
-    |> int.to_string
-    |> string.pad_start(2, "0")
-  }
+  <> pad2(day)
   <> " "
-  <> short_month
+  <> short_string_month(value)
   <> " "
   <> int.to_string(year)
   <> " "
-  <> {
-    hour
-    |> int.to_string
-    |> string.pad_start(2, "0")
-  }
+  <> pad2(hour)
   <> ":"
-  <> {
-    minute
-    |> int.to_string
-    |> string.pad_start(2, "0")
-  }
+  <> pad2(minute)
   <> ":"
-  <> {
-    second
-    |> int.to_string
-    |> string.pad_start(2, "0")
-  }
+  <> pad2(second)
   <> " GMT"
 }
 
 /// like `to_http` but assumes the offset in the DateTime value instead of `GMT`
 pub fn to_http_with_offset(value: Time) -> String {
   let #(#(year, _, day), #(hour, minute, second, _), offset) = to_parts(value)
-  let short_weekday = short_string_weekday(value)
-  let short_month = short_string_month(value)
 
   let offset = case offset {
     "Z" -> "GMT"
     _ -> offset
   }
 
-  short_weekday
+  short_string_weekday(value)
   <> ", "
-  <> {
-    day
-    |> int.to_string
-    |> string.pad_start(2, "0")
-  }
+  <> pad2(day)
   <> " "
-  <> short_month
+  <> short_string_month(value)
   <> " "
   <> int.to_string(year)
   <> " "
-  <> {
-    hour
-    |> int.to_string
-    |> string.pad_start(2, "0")
-  }
+  <> pad2(hour)
   <> ":"
-  <> {
-    minute
-    |> int.to_string
-    |> string.pad_start(2, "0")
-  }
+  <> pad2(minute)
   <> ":"
-  <> {
-    second
-    |> int.to_string
-    |> string.pad_start(2, "0")
-  }
+  <> pad2(second)
   <> " "
   <> offset
 }
@@ -852,66 +717,102 @@ pub fn from_http(value: String) -> Result(Time, Nil) {
 
 /// unix timestamps are the number of seconds that have elapsed since 00:00:00 UTC on January 1st, 1970
 pub fn to_unix(value: Time) -> Int {
-  case value {
-    Time(t, _, _, _) -> t / 1_000_000
-  }
+  let Time(timestamp: ts, ..) = value
+  let #(seconds, _) = timestamp.to_unix_seconds_and_nanoseconds(ts)
+  seconds
 }
 
 /// unix timestamps are the number of seconds that have elapsed since 00:00:00 UTC on January 1st, 1970
 pub fn from_unix(value: Int) -> Time {
-  Time(value * 1_000_000, 0, option.None, option.None)
+  Time(
+    timestamp.from_unix_seconds(value),
+    time_duration.seconds(0),
+    option.None,
+    option.None,
+  )
 }
 
 /// unix milli timestamps are the number of milliseconds that have elapsed since 00:00:00 UTC on January 1st, 1970
 pub fn to_unix_milli(value: Time) -> Int {
-  case value {
-    Time(t, _, _, _) -> t / 1000
-  }
+  let Time(timestamp: ts, ..) = value
+  let #(seconds, nanoseconds) = timestamp.to_unix_seconds_and_nanoseconds(ts)
+  seconds * 1000 + nanoseconds / 1_000_000
 }
 
 /// unix milli timestamps are the number of milliseconds that have elapsed since 00:00:00 UTC on January 1st, 1970
 pub fn from_unix_milli(value: Int) -> Time {
-  Time(value * 1000, 0, option.None, option.None)
+  let seconds = value / 1000
+  let nanoseconds = { value % 1000 } * 1_000_000
+  Time(
+    timestamp.from_unix_seconds_and_nanoseconds(seconds, nanoseconds),
+    time_duration.seconds(0),
+    option.None,
+    option.None,
+  )
 }
 
 /// unix micro timestamps are the number of microseconds that have elapsed since 00:00:00 UTC on January 1st, 1970
 pub fn to_unix_micro(value: Time) -> Int {
-  case value {
-    Time(t, _, _, _) -> t
-  }
+  let Time(timestamp: ts, ..) = value
+  let #(seconds, nanoseconds) = timestamp.to_unix_seconds_and_nanoseconds(ts)
+  seconds * 1_000_000 + nanoseconds / 1000
 }
 
 /// unix micro timestamps are the number of microseconds that have elapsed since 00:00:00 UTC on January 1st, 1970
 pub fn from_unix_micro(value: Int) -> Time {
-  Time(value, 0, option.None, option.None)
+  let seconds = value / 1_000_000
+  let nanoseconds = { value % 1_000_000 } * 1000
+  Time(
+    timestamp.from_unix_seconds_and_nanoseconds(seconds, nanoseconds),
+    time_duration.seconds(0),
+    option.None,
+    option.None,
+  )
+}
+
+/// unix nano timestamps are the number of nanoseconds that have elapsed since 00:00:00 UTC on January 1st, 1970
+pub fn to_unix_nano(value: Time) -> Int {
+  let Time(timestamp: ts, ..) = value
+  let #(seconds, nanoseconds) = timestamp.to_unix_seconds_and_nanoseconds(ts)
+  seconds * 1_000_000_000 + nanoseconds
+}
+
+/// unix nano timestamps are the number of nanoseconds that have elapsed since 00:00:00 UTC on January 1st, 1970
+pub fn from_unix_nano(value: Int) -> Time {
+  let seconds = value / 1_000_000_000
+  let nanoseconds = value % 1_000_000_000
+  Time(
+    timestamp.from_unix_seconds_and_nanoseconds(seconds, nanoseconds),
+    time_duration.seconds(0),
+    option.None,
+    option.None,
+  )
 }
 
 pub fn compare(a: Time, b: Time) -> order.Order {
-  let Time(wall_time: wta, offset: _, timezone: _, monotonic_time: mta) = a
-  let Time(wall_time: wtb, offset: _, timezone: _, monotonic_time: mtb) = b
+  let Time(timestamp: tsa, monotonic_time: mta, ..) = a
+  let Time(timestamp: tsb, monotonic_time: mtb, ..) = b
 
-  let #(ta, tb) = case mta, mtb {
-    option.Some(ta), option.Some(tb) -> #(ta, tb)
-    _, _ -> #(wta, wtb)
-  }
-
-  case ta == tb, ta < tb {
-    True, _ -> order.Eq
-    _, True -> order.Lt
-    _, False -> order.Gt
+  // Prefer monotonic time for comparison if both have it
+  case mta, mtb {
+    option.Some(ma), option.Some(mb) -> int.compare(ma, mb)
+    _, _ -> timestamp.compare(tsa, tsb)
   }
 }
 
 pub fn difference(a: Time, b: Time) -> duration.Duration {
-  let Time(wall_time: wta, offset: _, timezone: _, monotonic_time: mta) = a
-  let Time(wall_time: wtb, offset: _, timezone: _, monotonic_time: mtb) = b
+  let Time(timestamp: tsa, monotonic_time: mta, ..) = a
+  let Time(timestamp: tsb, monotonic_time: mtb, ..) = b
 
-  let #(ta, tb) = case mta, mtb {
-    option.Some(ta), option.Some(tb) -> #(ta, tb)
-    _, _ -> #(wta, wtb)
+  // Prefer monotonic time for difference if both have it
+  case mta, mtb {
+    option.Some(ma), option.Some(mb) -> {
+      // Monotonic time is in microseconds, convert to nanoseconds for Duration
+      let diff_micros = ma - mb
+      duration.micro_seconds(diff_micros)
+    }
+    _, _ -> timestamp.difference(tsa, tsb)
   }
-
-  duration.Duration(ta - tb)
 }
 
 const string_to_units = [
@@ -995,69 +896,49 @@ pub fn legible_difference(a: Time, b: Time) -> String {
 
       case is_negative {
         True -> "in " <> int.to_string(amount) <> " " <> unit
-        False ->
-          amount
-          |> int.absolute_value
-          |> int.to_string
-          <> " "
-          <> unit
-          <> " ago"
+        False -> int.to_string(amount) <> " " <> unit <> " ago"
       }
     }
   }
 }
 
-pub fn add(value: Time, duration: duration.Duration) -> Time {
-  let Time(wall_time: wt, offset: o, timezone: timezone, monotonic_time: mt) =
+pub fn add(value: Time, dur: duration.Duration) -> Time {
+  let Time(timestamp: ts, offset: o, timezone: timezone, monotonic_time: mt) =
     value
-  let duration.Duration(duration) = duration
-  case mt {
-    option.Some(mt) ->
-      Time(
-        wall_time: wt + duration,
-        offset: o,
-        timezone: timezone,
-        monotonic_time: option.Some(mt + duration),
-      )
-    option.None ->
-      Time(
-        wall_time: wt + duration,
-        offset: o,
-        timezone: timezone,
-        monotonic_time: option.None,
-      )
-  }
+  let new_ts = timestamp.add(ts, dur)
+
+  // Also update monotonic time if present (it's in microseconds)
+  let dur_micros = duration_to_microseconds(dur)
+  let new_mt = option.map(mt, fn(m) { m + dur_micros })
+
+  Time(timestamp: new_ts, offset: o, timezone: timezone, monotonic_time: new_mt)
 }
 
-pub fn subtract(value: Time, duration: duration.Duration) -> Time {
-  let Time(wall_time: wt, offset: o, timezone: timezone, monotonic_time: mt) =
+pub fn subtract(value: Time, dur: duration.Duration) -> Time {
+  let Time(timestamp: ts, offset: o, timezone: timezone, monotonic_time: mt) =
     value
-  let duration.Duration(duration) = duration
-  case mt {
-    option.Some(mt) ->
-      Time(
-        wall_time: wt - duration,
-        offset: o,
-        timezone: timezone,
-        monotonic_time: option.Some(mt - duration),
-      )
-    option.None ->
-      Time(
-        wall_time: wt - duration,
-        offset: o,
-        timezone: timezone,
-        monotonic_time: option.None,
-      )
-  }
+  // gleam_time doesn't have subtract, so negate the duration and add
+  // difference(a, b) = b - a, so difference(dur, 0) = 0 - dur = -dur
+  let negated_dur = time_duration.difference(dur, time_duration.seconds(0))
+  let new_ts = timestamp.add(ts, negated_dur)
+
+  // Also update monotonic time if present (it's in microseconds)
+  let dur_micros = duration_to_microseconds(dur)
+  let new_mt = option.map(mt, fn(m) { m - dur_micros })
+
+  Time(timestamp: new_ts, offset: o, timezone: timezone, monotonic_time: new_mt)
 }
 
 pub fn weekday(value: Time) -> Weekday {
-  case value {
-    Time(wall_time: t, offset: o, timezone: _, monotonic_time: _) -> {
-      let assert Ok(weekday) = weekday_from_int(ffi_weekday(t, o))
-      weekday
-    }
-  }
+  let Time(timestamp: ts, offset: offset, ..) = value
+  // Get unix timestamp in microseconds and offset in microseconds for FFI
+  let #(seconds, nanoseconds) = timestamp.to_unix_seconds_and_nanoseconds(ts)
+  let micros = seconds * 1_000_000 + nanoseconds / 1000
+  let #(offset_seconds, _) = time_duration.to_seconds_and_nanoseconds(offset)
+  let offset_micros = offset_seconds * 1_000_000
+
+  let assert Ok(wd) = weekday_from_int(ffi_weekday(micros, offset_micros))
+  wd
 }
 
 pub fn string_weekday(value: Time) -> String {
@@ -1166,9 +1047,8 @@ pub fn range(from a: Time, to b: option.Option(Time), step s: duration.Duration)
     option.Some(b) ->
       ranger.create(
         validate: fn(_) { True },
-        negate_step: fn(duration) {
-          let duration.Duration(value) = duration
-          duration.Duration(-1 * value)
+        negate_step: fn(dur) {
+          time_duration.difference(dur, time_duration.seconds(0))
         },
         add: add,
         compare: compare,
@@ -1185,21 +1065,19 @@ pub fn range(from a: Time, to b: option.Option(Time), step s: duration.Duration)
 
 /// WARNING: Does not respect daylight saving time!
 pub fn set_timezone(value: Time, new_timezone: String) -> Result(Time, Nil) {
-  case list.key_find(zones.list, new_timezone) {
-    Ok(new_offset_number) -> {
-      case value {
-        Time(wall_time: t, offset: _, timezone: _, monotonic_time: mt) ->
-          Time(t, new_offset_number * 1_000_000, option.Some(new_timezone), mt)
-          |> Ok
-      }
-    }
-
-    Error(Nil) -> Error(Nil)
-  }
+  use new_offset_seconds <- result.try(list.key_find(zones.list, new_timezone))
+  let Time(timestamp: ts, monotonic_time: mt, ..) = value
+  Time(
+    ts,
+    time_duration.seconds(new_offset_seconds),
+    option.Some(new_timezone),
+    mt,
+  )
+  |> Ok
 }
 
 pub fn get_timezone(value: Time) -> option.Option(String) {
-  let Time(_, _, timezone, _) = value
+  let Time(timezone: timezone, ..) = value
   timezone
 }
 
@@ -1209,27 +1087,31 @@ pub fn get_timezone(value: Time) -> option.Option(String) {
 ///
 /// `"+330", "03:30", "-8:00","-7", "-0400", "03", "Z"`
 pub fn set_offset(value: Time, new_offset: String) -> Result(Time, Nil) {
-  use new_offset_number <- result.try(parse_offset(new_offset))
-  case value {
-    Time(wall_time: t, offset: _, timezone: timezone, monotonic_time: mt) ->
-      Time(t, new_offset_number, timezone, mt)
-      |> Ok
-  }
+  use new_offset_seconds <- result.try(parse_offset(new_offset))
+  let Time(timestamp: ts, timezone: timezone, monotonic_time: mt, ..) = value
+  Time(ts, time_duration.seconds(new_offset_seconds), timezone, mt)
+  |> Ok
 }
 
 pub fn get_offset(value: Time) -> String {
-  let Time(_, offset, _, _) = value
-  let assert Ok(offset) = generate_offset(offset)
+  let Time(offset: offset, ..) = value
+  let assert Ok(offset_str) = generate_offset(offset)
+  offset_str
+}
+
+/// Get the offset as a gleam_time Duration
+pub fn get_offset_duration(value: Time) -> time_duration.Duration {
+  let Time(offset: offset, ..) = value
   offset
 }
 
 pub fn set_day(value: Time, day: Day) -> Time {
-  let #(_, time, offset) = to_parts(value)
+  let #(_, time, offset_str) = to_parts(value)
   let Day(year, month, date) = day
-  let assert Ok(new_value) = from_parts(#(year, month, date), time, offset)
+  let assert Ok(new_value) = from_parts(#(year, month, date), time, offset_str)
 
   Time(
-    new_value.wall_time,
+    new_value.timestamp,
     new_value.offset,
     value.timezone,
     value.monotonic_time,
@@ -1242,13 +1124,15 @@ pub fn get_day(value: Time) -> Day {
 }
 
 pub fn set_time_of_day(value: Time, time: TimeOfDay) -> Time {
-  let #(date, _, offset) = to_parts(value)
-  let TimeOfDay(hour, minute, second, milli_second) = time
+  let #(date, _, offset_str) = to_parts(value)
+  // TimeOfDay stores nanoseconds; convert to milliseconds for from_parts
+  let TimeOfDay(hour, minute, second, nanosecond) = time
+  let milli_second = nanosecond / 1_000_000
   let assert Ok(new_value) =
-    from_parts(date, #(hour, minute, second, milli_second), offset)
+    from_parts(date, #(hour, minute, second, milli_second), offset_str)
 
   Time(
-    new_value.wall_time,
+    new_value.timestamp,
     new_value.offset,
     value.timezone,
     value.monotonic_time,
@@ -1257,7 +1141,8 @@ pub fn set_time_of_day(value: Time, time: TimeOfDay) -> Time {
 
 pub fn get_time_of_day(value: Time) -> TimeOfDay {
   let #(_, #(hour, minute, second, milli_second), _) = to_parts(value)
-  TimeOfDay(hour, minute, second, milli_second)
+  // Convert milliseconds to nanoseconds for TimeOfDay
+  TimeOfDay(hour, minute, second, milli_second * 1_000_000)
 }
 
 @target(erlang)
@@ -1283,27 +1168,14 @@ pub fn from_erlang_local_datetime(
   erlang_datetime: #(#(Int, Int, Int), #(Int, Int, Int)),
 ) -> Time {
   let #(date, time) = erlang_datetime
-  let offset_in_minutes = ffi_local_offset()
+  let offset = calendar.local_offset()
 
-  let assert Time(wall_time, _, option.None, option.None) =
-    unix_epoch
+  let base =
+    unix_epoch()
     |> set_day(Day(date.0, date.1, date.2))
     |> set_time_of_day(TimeOfDay(time.0, time.1, time.2, 0))
 
-  let timezone = local_timezone()
-
-  Time(
-    wall_time,
-    offset_in_minutes * 60_000_000,
-    option.map(timezone, fn(tz) {
-      case list.any(zones.list, fn(item) { item.0 == tz }) {
-        True -> option.Some(tz)
-        False -> option.None
-      }
-    })
-      |> option.flatten,
-    option.None,
-  )
+  Time(base.timestamp, offset, validate_timezone(local_timezone()), option.None)
 }
 
 @target(erlang)
@@ -1313,7 +1185,7 @@ pub fn from_erlang_universal_datetime(
 ) -> Time {
   let #(date, time) = erlang_datetime
   let assert Ok(new_value) =
-    unix_epoch
+    unix_epoch()
     |> set_day(Day(date.0, date.1, date.2))
     |> set_time_of_day(TimeOfDay(time.0, time.1, time.2, 0))
     |> set_timezone("Etc/UTC")
@@ -1325,22 +1197,45 @@ fn from_parts(
   time: #(Int, Int, Int, Int),
   offset: String,
 ) -> Result(Time, Nil) {
-  use offset_number <- result.try(parse_offset(offset))
-  ffi_from_parts(#(date, time), offset_number)
-  |> Time(offset_number, option.None, option.None)
+  use offset_seconds <- result.try(parse_offset(offset))
+  let #(year, month, day) = date
+  let #(hour, minute, second, milli_second) = time
+
+  // Convert to gleam_time types
+  use gleam_month <- result.try(
+    calendar.month_from_int(month)
+    |> result.replace_error(Nil),
+  )
+
+  let calendar_date = calendar.Date(year, gleam_month, day)
+  // Store nanoseconds (milliseconds * 1_000_000)
+  let calendar_time =
+    calendar.TimeOfDay(hour, minute, second, milli_second * 1_000_000)
+  let offset_duration = time_duration.seconds(offset_seconds)
+
+  let ts =
+    timestamp.from_calendar(calendar_date, calendar_time, offset_duration)
+  Time(ts, offset_duration, option.None, option.None)
   |> Ok
 }
 
 fn to_parts(value: Time) -> #(#(Int, Int, Int), #(Int, Int, Int, Int), String) {
-  case value {
-    Time(wall_time: t, offset: o, timezone: _, monotonic_time: _) -> {
-      let #(date, time) = ffi_to_parts(t, o)
-      let assert Ok(offset) = generate_offset(o)
-      #(date, time, offset)
-    }
-  }
+  let Time(timestamp: ts, offset: offset, ..) = value
+
+  let #(date, time) = timestamp.to_calendar(ts, offset)
+  let month_int = calendar.month_to_int(date.month)
+  // Convert nanoseconds to milliseconds
+  let milli_second = time.nanoseconds / 1_000_000
+
+  let assert Ok(offset_string) = generate_offset(offset)
+  #(
+    #(date.year, month_int, date.day),
+    #(time.hours, time.minutes, time.seconds, milli_second),
+    offset_string,
+  )
 }
 
+/// Parse an offset string and return the offset in seconds
 fn parse_offset(offset: String) -> Result(Int, Nil) {
   use <- bool.guard(list.contains(["Z", "z"], offset), Ok(0))
   let assert Ok(re) = regexp.from_string("([+-])")
@@ -1356,20 +1251,19 @@ fn parse_offset(offset: String) -> Result(Int, Nil) {
     [hour_str, minute_str] -> {
       use hour <- result.try(int.parse(hour_str))
       use minute <- result.try(int.parse(minute_str))
-      Ok(sign * { hour * 60 + minute } * 60 * 1_000_000)
+      Ok(sign * { hour * 60 + minute } * 60)
     }
     [offset] ->
       case string.length(offset) {
         1 -> {
           use hour <- result.try(int.parse(offset))
-          Ok(sign * hour * 3600 * 1_000_000)
+          Ok(sign * hour * 3600)
         }
         2 -> {
           use number <- result.try(int.parse(offset))
           case number < 14 {
-            True -> Ok(sign * number * 3600 * 1_000_000)
-            False ->
-              Ok(sign * { number / 10 * 60 + number % 10 } * 60 * 1_000_000)
+            True -> Ok(sign * number * 3600)
+            False -> Ok(sign * { number / 10 * 60 + number % 10 } * 60)
           }
         }
         3 -> {
@@ -1377,14 +1271,14 @@ fn parse_offset(offset: String) -> Result(Int, Nil) {
           let minute_str = string.slice(offset, 1, 2)
           use hour <- result.try(int.parse(hour_str))
           use minute <- result.try(int.parse(minute_str))
-          Ok(sign * { hour * 60 + minute } * 60 * 1_000_000)
+          Ok(sign * { hour * 60 + minute } * 60)
         }
         4 -> {
           let hour_str = string.slice(offset, 0, 2)
           let minute_str = string.slice(offset, 2, 2)
           use hour <- result.try(int.parse(hour_str))
           use minute <- result.try(int.parse(minute_str))
-          Ok(sign * { hour * 60 + minute } * 60 * 1_000_000)
+          Ok(sign * { hour * 60 + minute } * 60)
         }
         _ -> Error(Nil)
       }
@@ -1392,65 +1286,48 @@ fn parse_offset(offset: String) -> Result(Int, Nil) {
   }
 }
 
-fn generate_offset(offset: Int) -> Result(String, Nil) {
-  use <- bool.guard(offset == 0, Ok("Z"))
-  case
-    [#(offset, duration.MicroSecond)]
-    |> duration.new
-    |> duration.decompose
-  {
-    [#(hour, duration.Hour), #(minute, duration.Minute)] ->
-      [
-        case hour > 0 {
-          True ->
-            string.concat([
-              "+",
-              hour
-                |> int.to_string
-                |> string.pad_start(2, "0"),
-            ])
-          False ->
-            string.concat([
-              "-",
-              hour
-                |> int.absolute_value
-                |> int.to_string
-                |> string.pad_start(2, "0"),
-            ])
-        },
-        minute
-          |> int.absolute_value
-          |> int.to_string
-          |> string.pad_start(2, "0"),
-      ]
-      |> string.join(":")
-      |> Ok
+fn pad2(value: Int) -> String {
+  value
+  |> int.to_string
+  |> string.pad_start(2, "0")
+}
 
-    [#(hour, duration.Hour)] ->
-      [
-        case hour > 0 {
-          True ->
-            string.concat([
-              "+",
-              hour
-                |> int.to_string
-                |> string.pad_start(2, "0"),
-            ])
-          False ->
-            string.concat([
-              "-",
-              hour
-                |> int.absolute_value
-                |> int.to_string
-                |> string.pad_start(2, "0"),
-            ])
-        },
-        "00",
-      ]
-      |> string.join(":")
-      |> Ok
-    _ -> Error(Nil)
+fn pad3(value: Int) -> String {
+  value
+  |> int.to_string
+  |> string.pad_start(3, "0")
+}
+
+/// Validates that a timezone string from the system is a known timezone
+fn validate_timezone(timezone: option.Option(String)) -> option.Option(String) {
+  timezone
+  |> option.map(fn(tz) {
+    case list.any(zones.list, fn(item) { item.0 == tz }) {
+      True -> option.Some(tz)
+      False -> option.None
+    }
+  })
+  |> option.flatten
+}
+
+fn duration_to_microseconds(dur: time_duration.Duration) -> Int {
+  let #(seconds, nanoseconds) = time_duration.to_seconds_and_nanoseconds(dur)
+  seconds * 1_000_000 + nanoseconds / 1000
+}
+
+fn generate_offset(offset: time_duration.Duration) -> Result(String, Nil) {
+  let #(total_seconds, _) = time_duration.to_seconds_and_nanoseconds(offset)
+  use <- bool.guard(total_seconds == 0, Ok("Z"))
+
+  let abs_seconds = int.absolute_value(total_seconds)
+  let sign = case total_seconds < 0 {
+    True -> "-"
+    False -> "+"
   }
+
+  Ok(
+    sign <> pad2(abs_seconds / 3600) <> ":" <> pad2({ abs_seconds % 3600 } / 60),
+  )
 }
 
 fn parse_date_section(date: String) -> Result(List(Int), Nil) {
@@ -1513,11 +1390,8 @@ fn is_invalid_date(date: String) -> Bool {
   |> string.to_utf_codepoints
   |> list.map(string.utf_codepoint_to_int)
   |> list.any(fn(code) {
-    case code {
-      _ if code == 45 -> False
-      _ if code >= 48 && code <= 57 -> False
-      _ -> True
-    }
+    // Only allow digits (48-57) and hyphen (45)
+    code != 45 && { code < 48 || code > 57 }
   })
 }
 
@@ -1526,10 +1400,8 @@ fn is_invalid_time(time: String) -> Bool {
   |> string.to_utf_codepoints
   |> list.map(string.utf_codepoint_to_int)
   |> list.any(fn(code) {
-    case code {
-      _ if code >= 48 && code <= 58 -> False
-      _ -> True
-    }
+    // Only allow digits (48-57) and colon (58)
+    code < 48 || code > 58
   })
 }
 
@@ -1634,29 +1506,17 @@ const month_strings = [
   #(Dec, #("December", "Dec")),
 ]
 
-@external(erlang, "birl_ffi", "now")
-@external(javascript, "./birl_ffi.mjs", "now")
-fn ffi_now() -> Int
-
-@external(erlang, "birl_ffi", "local_offset")
-@external(javascript, "./birl_ffi.mjs", "local_offset")
-fn ffi_local_offset() -> Int
+// ---------------------------------------------------------------------------
+// FFI functions for features gleam_time doesn't provide
+// ---------------------------------------------------------------------------
 
 @external(erlang, "birl_ffi", "monotonic_now")
 @external(javascript, "./birl_ffi.mjs", "monotonic_now")
 fn ffi_monotonic_now() -> Int
 
-@external(erlang, "birl_ffi", "to_parts")
-@external(javascript, "./birl_ffi.mjs", "to_parts")
-fn ffi_to_parts(a: Int, b: Int) -> #(#(Int, Int, Int), #(Int, Int, Int, Int))
-
-@external(erlang, "birl_ffi", "from_parts")
-@external(javascript, "./birl_ffi.mjs", "from_parts")
-fn ffi_from_parts(a: #(#(Int, Int, Int), #(Int, Int, Int, Int)), b: Int) -> Int
-
 @external(erlang, "birl_ffi", "weekday")
 @external(javascript, "./birl_ffi.mjs", "weekday")
-fn ffi_weekday(a: Int, b: Int) -> Int
+fn ffi_weekday(timestamp_micros: Int, offset_micros: Int) -> Int
 
 @external(erlang, "birl_ffi", "local_timezone")
 @external(javascript, "./birl_ffi.mjs", "local_timezone")
@@ -1671,20 +1531,25 @@ fn local_timezone() -> option.Option(String)
 /// Note: This conversion loses offset/timezone information since Timestamp
 /// represents an absolute point in time (like UTC).
 pub fn to_timestamp(value: Time) -> timestamp.Timestamp {
-  let Time(wall_time: t, ..) = value
-  // birl uses microseconds, gleam_time uses seconds + nanoseconds
-  let seconds = t / 1_000_000
-  let nanoseconds = { t % 1_000_000 } * 1000
-  timestamp.from_unix_seconds_and_nanoseconds(seconds, nanoseconds)
+  let Time(timestamp: ts, ..) = value
+  ts
+}
+
+/// Alias for to_timestamp, using the to_gleam_* naming pattern
+pub fn to_gleam_timestamp(value: Time) -> timestamp.Timestamp {
+  to_timestamp(value)
 }
 
 /// Convert gleam_time Timestamp to birl Time.
 ///
 /// The resulting Time will be in UTC with no timezone information.
 pub fn from_timestamp(ts: timestamp.Timestamp) -> Time {
-  let #(seconds, nanoseconds) = timestamp.to_unix_seconds_and_nanoseconds(ts)
-  let microseconds = seconds * 1_000_000 + nanoseconds / 1000
-  Time(microseconds, 0, option.Some("Etc/UTC"), option.None)
+  Time(ts, time_duration.seconds(0), option.Some("Etc/UTC"), option.None)
+}
+
+/// Alias for from_timestamp, using the from_gleam_* naming pattern
+pub fn from_gleam_timestamp(ts: timestamp.Timestamp) -> Time {
+  from_timestamp(ts)
 }
 
 /// Convert birl Day to gleam_time calendar.Date.
@@ -1699,22 +1564,11 @@ pub fn date_to_day(date: calendar.Date) -> Day {
 }
 
 /// Convert birl TimeOfDay to gleam_time calendar.TimeOfDay.
-///
-/// Note: birl stores milliseconds while gleam_time stores nanoseconds,
-/// so some precision may be gained (with zeros in the nanosecond places).
 pub fn time_of_day_to_calendar(tod: TimeOfDay) -> calendar.TimeOfDay {
-  calendar.TimeOfDay(
-    tod.hour,
-    tod.minute,
-    tod.second,
-    tod.milli_second * 1_000_000,
-  )
+  calendar.TimeOfDay(tod.hour, tod.minute, tod.second, tod.nanosecond)
 }
 
 /// Convert gleam_time calendar.TimeOfDay to birl TimeOfDay.
-///
-/// Note: gleam_time stores nanoseconds while birl stores milliseconds,
-/// so sub-millisecond precision will be lost.
 pub fn calendar_to_time_of_day(tod: calendar.TimeOfDay) -> TimeOfDay {
-  TimeOfDay(tod.hours, tod.minutes, tod.seconds, tod.nanoseconds / 1_000_000)
+  TimeOfDay(tod.hours, tod.minutes, tod.seconds, tod.nanoseconds)
 }

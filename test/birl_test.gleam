@@ -22,7 +22,7 @@ const minute = 38
 
 const second = 23
 
-const milli_second = 0
+const nanosecond = 0
 
 const offset = "+03:30"
 
@@ -70,7 +70,7 @@ pub fn to_parts_test() {
 
   time
   |> birl.get_time_of_day
-  |> should.equal(birl.TimeOfDay(hour, minute, second, milli_second))
+  |> should.equal(birl.TimeOfDay(hour, minute, second, nanosecond))
 
   time
   |> birl.get_offset
@@ -105,16 +105,16 @@ pub fn get_date_accessor_test() {
   time.second
   |> should.equal(second)
 
-  time.milli_second
-  |> should.equal(milli_second)
+  time.nanosecond
+  |> should.equal(nanosecond)
 }
 
 pub fn from_parts_test() {
-  birl.unix_epoch
+  birl.unix_epoch()
   |> birl.set_offset(offset)
   |> should.be_ok
   |> birl.set_day(birl.Day(year, month, date))
-  |> birl.set_time_of_day(birl.TimeOfDay(hour, minute, second, milli_second))
+  |> birl.set_time_of_day(birl.TimeOfDay(hour, minute, second, nanosecond))
   |> birl.to_iso8601
   |> should.equal(iso_datetime)
 }
@@ -193,10 +193,12 @@ pub fn weird_value8_test() {
 }
 
 pub fn time_of_day_to_string_test() {
-  birl.time_of_day_to_string(birl.TimeOfDay(8, 5, 9, 2))
+  // nanosecond field: 2_000_000 nanoseconds = 2 milliseconds
+  birl.time_of_day_to_string(birl.TimeOfDay(8, 5, 9, 2_000_000))
   |> should.equal("8:05:09.002")
 
-  birl.time_of_day_to_string(birl.TimeOfDay(16, 30, 20, 999))
+  // nanosecond field: 999_000_000 nanoseconds = 999 milliseconds
+  birl.time_of_day_to_string(birl.TimeOfDay(16, 30, 20, 999_000_000))
   |> should.equal("16:30:20.999")
 
   birl.time_of_day_to_string(birl.TimeOfDay(0, 0, 0, 0))
@@ -288,7 +290,7 @@ pub fn timestamp_roundtrip_test() {
 }
 
 pub fn timestamp_epoch_test() {
-  let ts = birl.to_timestamp(birl.unix_epoch)
+  let ts = birl.to_timestamp(birl.unix_epoch())
   let #(seconds, nanoseconds) = timestamp.to_unix_seconds_and_nanoseconds(ts)
   seconds
   |> should.equal(0)
@@ -296,21 +298,10 @@ pub fn timestamp_epoch_test() {
   |> should.equal(0)
 }
 
-pub fn duration_roundtrip_test() {
-  let d = duration.hours(2) |> duration.add(duration.minutes(30))
-  let gleam_d = duration.to_gleam_duration(d)
-  let back = duration.from_gleam_duration(gleam_d)
-  d
-  |> should.equal(back)
-}
-
-pub fn duration_conversion_test() {
-  // 1 second = 1_000_000 microseconds in birl
-  // 1 second = 1_000_000_000 nanoseconds in gleam_time
+pub fn duration_is_gleam_time_duration_test() {
+  // Duration is gleam_time's Duration type, so it works directly
   let d = duration.seconds(1)
-  let gleam_d = duration.to_gleam_duration(d)
-  let #(seconds, nanoseconds) =
-    time_duration.to_seconds_and_nanoseconds(gleam_d)
+  let #(seconds, nanoseconds) = time_duration.to_seconds_and_nanoseconds(d)
   seconds
   |> should.equal(1)
   nanoseconds
@@ -337,15 +328,98 @@ pub fn day_to_date_test() {
 }
 
 pub fn time_of_day_roundtrip_test() {
-  let tod = birl.TimeOfDay(14, 30, 45, 123)
+  let tod = birl.TimeOfDay(14, 30, 45, 123_000_000)
   let calendar_tod = birl.time_of_day_to_calendar(tod)
   let back = birl.calendar_to_time_of_day(calendar_tod)
   tod
   |> should.equal(back)
 }
 
+pub fn to_unix_nano_test() {
+  birl.unix_epoch()
+  |> birl.to_unix_nano
+  |> should.equal(0)
+
+  // 1 second = 1_000_000_000 nanoseconds
+  birl.from_unix(1)
+  |> birl.to_unix_nano
+  |> should.equal(1_000_000_000)
+}
+
+pub fn from_unix_nano_test() {
+  birl.from_unix_nano(0)
+  |> birl.to_unix
+  |> should.equal(0)
+
+  birl.from_unix_nano(1_000_000_000)
+  |> birl.to_unix
+  |> should.equal(1)
+}
+
+pub fn unix_nano_roundtrip_test() {
+  let now = birl.utc_now()
+  let nanos = birl.to_unix_nano(now)
+  let back = birl.from_unix_nano(nanos)
+  birl.to_unix_nano(back)
+  |> should.equal(nanos)
+}
+
+pub fn get_offset_duration_test() {
+  // UTC offset should be zero
+  let utc = birl.utc_now()
+  let #(seconds, nanoseconds) =
+    birl.get_offset_duration(utc)
+    |> time_duration.to_seconds_and_nanoseconds
+  seconds
+  |> should.equal(0)
+  nanoseconds
+  |> should.equal(0)
+
+  // +03:30 = 12600 seconds
+  let assert Ok(with_offset) = birl.set_offset(birl.utc_now(), "+03:30")
+  let #(offset_seconds, _) =
+    birl.get_offset_duration(with_offset)
+    |> time_duration.to_seconds_and_nanoseconds
+  offset_seconds
+  |> should.equal(12_600)
+}
+
+pub fn to_gleam_timestamp_test() {
+  let now = birl.utc_now()
+  // to_gleam_timestamp should return the same result as to_timestamp
+  let ts1 = birl.to_timestamp(now)
+  let ts2 = birl.to_gleam_timestamp(now)
+  timestamp.compare(ts1, ts2)
+  |> should.equal(order.Eq)
+}
+
+pub fn from_gleam_timestamp_test() {
+  let ts = timestamp.from_unix_seconds(1_000_000)
+  // from_gleam_timestamp should return the same result as from_timestamp
+  let t1 = birl.from_timestamp(ts)
+  let t2 = birl.from_gleam_timestamp(ts)
+  birl.compare(t1, t2)
+  |> should.equal(order.Eq)
+}
+
+pub fn duration_nano_seconds_test() {
+  let d = duration.nano_seconds(1_000_000_000)
+  let #(seconds, nanoseconds) = time_duration.to_seconds_and_nanoseconds(d)
+  seconds
+  |> should.equal(1)
+  nanoseconds
+  |> should.equal(0)
+
+  let d2 = duration.nano_seconds(500)
+  let #(seconds2, nanoseconds2) = time_duration.to_seconds_and_nanoseconds(d2)
+  seconds2
+  |> should.equal(0)
+  nanoseconds2
+  |> should.equal(500)
+}
+
 pub fn time_of_day_to_calendar_test() {
-  let tod = birl.TimeOfDay(14, 30, 45, 123)
+  let tod = birl.TimeOfDay(14, 30, 45, 123_000_000)
   let calendar_tod = birl.time_of_day_to_calendar(tod)
   calendar_tod.hours
   |> should.equal(14)
@@ -353,7 +427,7 @@ pub fn time_of_day_to_calendar_test() {
   |> should.equal(30)
   calendar_tod.seconds
   |> should.equal(45)
-  // 123 milliseconds = 123_000_000 nanoseconds
+  // 123_000_000 nanoseconds = 123 milliseconds
   calendar_tod.nanoseconds
   |> should.equal(123_000_000)
 }
